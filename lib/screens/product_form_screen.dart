@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
 import '../data/database_helper.dart';
+import '../models/category_model.dart';
+import '../data/supplier_database_helper.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
 
 class ProductFormScreen extends StatefulWidget {
   final Product? product;
@@ -24,32 +28,19 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
   // Dropdown States
   String _selectedCategory = 'Minuman';
   String _selectedUnit = 'pcs';
-  String _selectedSupplier = 'Indofood';
+  String _selectedSupplier = 'Lainnya';
 
   // Counter States
   int _stockCount = 0;
   int _minStockAlert = 5;
 
-  // Image upload state simulation
-  String? _simulatedImagePath;
+  String? _imagePath;
   bool _isSubmitting = false;
+  bool _isLoadingDropdowns = true;
 
-  final List<String> _categories = [
-    'Minuman',
-    'Makanan',
-    'Elektronik',
-    'Lainnya',
-  ];
+  List<String> _categories = ['Minuman'];
   final List<String> _units = ['pcs', 'box', 'pack', 'kg', 'liter'];
-  final List<String> _suppliers = [
-    'Indofood',
-    'Ultra Jaya',
-    'Santos Jaya Abadi',
-    'Baseus',
-    'Broco',
-    'Gulaku Corp',
-    'Lainnya',
-  ];
+  List<String> _suppliers = ['Lainnya'];
 
   @override
   void initState() {
@@ -67,16 +58,12 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       );
       _rackLocationController = TextEditingController(text: p.lokasiRak);
       _descriptionController = TextEditingController(text: p.description);
-      _selectedCategory = _categories.contains(p.category)
-          ? p.category
-          : 'Lainnya';
+      _selectedCategory = p.category;
       _selectedUnit = _units.contains(p.satuan) ? p.satuan : 'pcs';
-      _selectedSupplier = _suppliers.contains(p.supplier)
-          ? p.supplier
-          : 'Lainnya';
+      _selectedSupplier = p.supplier;
       _stockCount = p.stock;
       _minStockAlert = p.minStockAlert;
-      _simulatedImagePath = p.imageUrl;
+      _imagePath = p.imageUrl;
     } else {
       // Add Mode: Clean fields
       _nameController = TextEditingController();
@@ -88,6 +75,46 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       _stockCount = 0;
       _minStockAlert = 5;
     }
+    _loadDropdownData();
+  }
+
+  Future<void> _loadDropdownData() async {
+    final categories = await DatabaseHelper.instance.getCategories();
+    final suppliers = await SupplierDatabaseHelper.instance.getSuppliers();
+
+    final categoryNames = categories.map((c) => c.name).toList();
+    final supplierNames = suppliers.map((s) => s.name).toList();
+    if (!supplierNames.contains('Lainnya')) supplierNames.add('Lainnya');
+
+    setState(() {
+      _categories = categoryNames.isNotEmpty ? categoryNames : ['Lainnya'];
+      _suppliers = supplierNames.isNotEmpty ? supplierNames : ['Lainnya'];
+      _isLoadingDropdowns = false;
+
+      // Fix selected values if not in loaded list
+      if (!_categories.contains(_selectedCategory)) {
+        _selectedCategory = _categories.first;
+      }
+      if (!_suppliers.contains(_selectedSupplier)) {
+        _selectedSupplier = _suppliers.last; // 'Lainnya'
+      }
+    });
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 800,
+      imageQuality: 85,
+    );
+    if (picked != null) {
+      setState(() => _imagePath = picked.path);
+    }
+  }
+
+  void _removeImage() {
+    setState(() => _imagePath = null);
   }
 
   @override
@@ -101,23 +128,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     super.dispose();
   }
 
-  /// Simulate image picker path updates
-  void _simulateImageUpload() {
-    setState(() {
-      if (_simulatedImagePath == null) {
-        _simulatedImagePath =
-            'assets/images/products/prod_${DateTime.now().millisecondsSinceEpoch}.jpg';
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto berhasil diupload (Simulasi)')),
-        );
-      } else {
-        _simulatedImagePath = null;
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('Foto dihapus')));
-      }
-    });
-  }
+  // Removed _simulateImageUpload method
 
   /// Handles form submission pipeline (CREATE or UPDATE)
   Future<void> _submitForm() async {
@@ -137,7 +148,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         stock: _stockCount,
         price: double.tryParse(_priceController.text.trim()) ?? 0.0,
         supplier: _selectedSupplier,
-        imageUrl: _simulatedImagePath,
+        imageUrl: _imagePath,
         sku: _skuController.text.trim(),
         satuan: _selectedUnit,
         hargaBeli: double.tryParse(_purchasePriceController.text.trim()) ?? 0.0,
@@ -293,13 +304,13 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 
-  /// Builds image upload container mockup
+  /// Builds image upload container using image_picker
   Widget _buildImagePicker(Color secondaryColor) {
-    final hasImage = _simulatedImagePath != null;
+    final hasImage = _imagePath != null;
 
     return Center(
       child: GestureDetector(
-        onTap: _simulateImageUpload,
+        onTap: hasImage ? null : _pickImage,
         child: Container(
           width: 120,
           height: 120,
@@ -318,27 +329,28 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Container(
-                        color: const Color(0xFFE2E8F0),
-                        child: const Icon(
-                          Icons.image,
-                          size: 48,
-                          color: Color(0xFF64748B),
-                        ),
+                      Image.file(
+                        File(_imagePath!),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
                       ),
                       Positioned(
                         right: 4,
                         top: 4,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: Colors.white,
+                        child: GestureDetector(
+                          onTap: _removeImage,
+                          child: Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: const BoxDecoration(
+                              color: Colors.redAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              size: 14,
+                              color: Colors.white,
+                            ),
                           ),
                         ),
                       ),
@@ -455,23 +467,25 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                         ),
                       ),
                       const SizedBox(height: 6),
-                      DropdownButtonFormField<String>(
-                        value: _selectedCategory,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: textColor,
-                        ),
-                        decoration: _buildInputDecoration('', secondaryColor),
-                        items: _categories
-                            .map(
-                              (c) => DropdownMenuItem(value: c, child: Text(c)),
-                            )
-                            .toList(),
-                        onChanged: (val) {
-                          if (val != null)
-                            setState(() => _selectedCategory = val);
-                        },
-                      ),
+                      _isLoadingDropdowns
+                          ? const Center(child: CircularProgressIndicator())
+                          : DropdownButtonFormField<String>(
+                              value: _selectedCategory,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: textColor,
+                              ),
+                              decoration: _buildInputDecoration('', secondaryColor),
+                              items: _categories
+                                  .map(
+                                    (c) => DropdownMenuItem(value: c, child: Text(c)),
+                                  )
+                                  .toList(),
+                              onChanged: (val) {
+                                if (val != null)
+                                  setState(() => _selectedCategory = val);
+                              },
+                            ),
                     ],
                   ),
                 ),
@@ -639,17 +653,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   ],
                 ),
-                _buildCounterWidget(
+                StockCounterWidget(
                   value: _stockCount,
                   buttonColor: secondaryColor,
-                  onMinus: () {
-                    if (_stockCount > 0) {
-                      setState(() => _stockCount--);
-                    }
-                  },
-                  onPlus: () {
-                    setState(() => _stockCount++);
-                  },
+                  onMinus: () { if (_stockCount > 0) setState(() => _stockCount--); },
+                  onPlus: () { setState(() => _stockCount++); },
                 ),
               ],
             ),
@@ -677,17 +685,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                     ),
                   ],
                 ),
-                _buildCounterWidget(
+                StockCounterWidget(
                   value: _minStockAlert,
-                  buttonColor: warningColor, // Amber warning color
-                  onMinus: () {
-                    if (_minStockAlert > 0) {
-                      setState(() => _minStockAlert--);
-                    }
-                  },
-                  onPlus: () {
-                    setState(() => _minStockAlert++);
-                  },
+                  buttonColor: warningColor,
+                  onMinus: () { if (_minStockAlert > 0) setState(() => _minStockAlert--); },
+                  onPlus: () { setState(() => _minStockAlert++); },
                 ),
               ],
             ),
@@ -703,20 +705,22 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
               ),
             ),
             const SizedBox(height: 6),
-            DropdownButtonFormField<String>(
-              value: _selectedSupplier,
-              style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
-              decoration: _buildInputDecoration(
-                'Pilih Supplier',
-                secondaryColor,
-              ),
-              items: _suppliers
-                  .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                  .toList(),
-              onChanged: (val) {
-                if (val != null) setState(() => _selectedSupplier = val);
-              },
-            ),
+            _isLoadingDropdowns
+                ? const Center(child: CircularProgressIndicator())
+                : DropdownButtonFormField<String>(
+                    value: _selectedSupplier,
+                    style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
+                    decoration: _buildInputDecoration(
+                      'Pilih Supplier',
+                      secondaryColor,
+                    ),
+                    items: _suppliers
+                        .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                        .toList(),
+                    onChanged: (val) {
+                      if (val != null) setState(() => _selectedSupplier = val);
+                    },
+                  ),
             const SizedBox(height: 16),
 
             // Lokasi Rak
@@ -853,67 +857,6 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     );
   }
 
-  Widget _buildCounterWidget({
-    required int value,
-    required Color buttonColor,
-    required VoidCallback onMinus,
-    required VoidCallback onPlus,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFCBD5E1)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Minus Button
-          GestureDetector(
-            onTap: onMinus,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: buttonColor.withOpacity(0.08),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  bottomLeft: Radius.circular(7),
-                ),
-              ),
-              child: Icon(Icons.remove, size: 18, color: buttonColor),
-            ),
-          ),
-          // Value Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              '$value',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF1A1B21),
-              ),
-            ),
-          ),
-          // Plus Button
-          GestureDetector(
-            onTap: onPlus,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: buttonColor.withOpacity(0.08),
-                borderRadius: const BorderRadius.only(
-                  topRight: Radius.circular(7),
-                  bottomRight: Radius.circular(7),
-                ),
-              ),
-              child: Icon(Icons.add, size: 18, color: buttonColor),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   InputDecoration _buildInputDecoration(String hint, Color activeBorderColor) {
     return InputDecoration(
       hintText: hint,
@@ -940,6 +883,104 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Colors.redAccent, width: 1.5),
+      ),
+    );
+  }
+}
+
+/// Custom Widget: StockCounterWidget
+/// A reusable counter widget with gesture support and animated press feedback
+class StockCounterWidget extends StatefulWidget {
+  final int value;
+  final Color buttonColor;
+  final VoidCallback onMinus;
+  final VoidCallback onPlus;
+
+  const StockCounterWidget({
+    super.key,
+    required this.value,
+    required this.buttonColor,
+    required this.onMinus,
+    required this.onPlus,
+  });
+
+  @override
+  State<StockCounterWidget> createState() => _StockCounterWidgetState();
+}
+
+class _StockCounterWidgetState extends State<StockCounterWidget> {
+  bool _minusPressed = false;
+  bool _plusPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border.all(color: const Color(0xFFCBD5E1)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Minus Button with press animation
+          GestureDetector(
+            onTapDown: (_) => setState(() => _minusPressed = true),
+            onTapUp: (_) {
+              setState(() => _minusPressed = false);
+              widget.onMinus();
+            },
+            onTapCancel: () => setState(() => _minusPressed = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _minusPressed
+                    ? widget.buttonColor.withOpacity(0.2)
+                    : widget.buttonColor.withOpacity(0.08),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(7),
+                  bottomLeft: Radius.circular(7),
+                ),
+              ),
+              child: Icon(Icons.remove, size: 18, color: widget.buttonColor),
+            ),
+          ),
+          // Value display
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              '${widget.value}',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF1A1B21),
+              ),
+            ),
+          ),
+          // Plus Button with press animation
+          GestureDetector(
+            onTapDown: (_) => setState(() => _plusPressed = true),
+            onTapUp: (_) {
+              setState(() => _plusPressed = false);
+              widget.onPlus();
+            },
+            onTapCancel: () => setState(() => _plusPressed = false),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 100),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: _plusPressed
+                    ? widget.buttonColor.withOpacity(0.2)
+                    : widget.buttonColor.withOpacity(0.08),
+                borderRadius: const BorderRadius.only(
+                  topRight: Radius.circular(7),
+                  bottomRight: Radius.circular(7),
+                ),
+              ),
+              child: Icon(Icons.add, size: 18, color: widget.buttonColor),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -5,6 +5,8 @@ import 'onboarding_screen.dart'; // Import to logout back to login phase
 import 'product_list_screen.dart';
 import 'transaction_screen.dart';
 import 'supplier_list_screen.dart';
+import '../data/database_helper.dart';
+import '../data/supplier_database_helper.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -17,6 +19,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // Preference States
   String _storeName = 'PDW Mart';
   String _ownerName = 'John Doe';
+  String _location = 'Bandung, Jawa Barat';
   bool _isDarkMode = false;
   bool _isSyncActive = true;
 
@@ -40,6 +43,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() {
           _storeName = prefs.getString('store_name') ?? 'PDW Mart';
           _ownerName = prefs.getString('owner_name') ?? 'John Doe';
+          _location = prefs.getString('store_location') ?? 'Bandung, Jawa Barat';
+          _isDarkMode = prefs.getBool('is_dark_mode') ?? false;
+          _isSyncActive = prefs.getBool('is_sync_active') ?? true;
           _isLoading = false;
         });
       }
@@ -53,16 +59,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   /// Save edited store preferences
-  Future<void> _savePreferences(String storeName, String ownerName) async {
+  Future<void> _savePreferences(
+      String storeName, String ownerName, String location) async {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('store_name', storeName);
       await prefs.setString('owner_name', ownerName);
+      await prefs.setString('store_location', location);
       if (mounted) {
         setState(() {
           _storeName = storeName;
           _ownerName = ownerName;
+          _location = location;
         });
       }
     } catch (e) {
@@ -89,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showEditStoreSheet() {
     final storeController = TextEditingController(text: _storeName);
     final ownerController = TextEditingController(text: _ownerName);
+    final locationController = TextEditingController(text: _location);
     final formKey = GlobalKey<FormState>();
 
     showModalBottomSheet(
@@ -163,13 +173,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: locationController,
+                  style: GoogleFonts.hankenGrotesk(fontWeight: FontWeight.w600),
+                  decoration: InputDecoration(
+                    labelText: 'Lokasi / Kota',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    prefixIcon: const Icon(Icons.location_on, color: Color(0xFF00236F)),
+                  ),
+                ),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () async {
                     if (formKey.currentState!.validate()) {
                       final store = storeController.text.trim();
                       final owner = ownerController.text.trim();
-                      await _savePreferences(store, owner);
+                      final loc = locationController.text.trim();
+                      await _savePreferences(store, owner, loc);
                       if (context.mounted) {
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -230,14 +251,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Semua data berhasil dibersihkan! (Simulasi)'),
-                    backgroundColor: Color(0xFFEF4444),
-                  ),
-                );
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                final navigator = Navigator.of(context);
+                navigator.pop();
+                
+                try {
+                  // Delete all products
+                  final products = await DatabaseHelper.instance.getProducts();
+                  for (final product in products) {
+                    await DatabaseHelper.instance.deleteProduct(product.id);
+                  }
+                  
+                  // Delete all categories
+                  final categories = await DatabaseHelper.instance.getCategories();
+                  for (final cat in categories) {
+                    await DatabaseHelper.instance.deleteCategory(cat.id);
+                  }
+                  
+                  // Delete all suppliers
+                  final suppliers = await SupplierDatabaseHelper.instance.getSuppliers();
+                  for (final sup in suppliers) {
+                    await SupplierDatabaseHelper.instance.deleteSupplier(sup.id);
+                  }
+                  
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      const SnackBar(
+                        content: Text('Semua data berhasil dihapus!'),
+                        backgroundColor: Color(0xFFEF4444),
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    messenger.showSnackBar(
+                      SnackBar(
+                        content: Text('Gagal menghapus data: $e'),
+                        backgroundColor: const Color(0xFFEF4444),
+                      ),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF4444),
@@ -282,7 +337,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     // Specs colors palette
     const Color headerPrimary = Color(0xFF00236F);
-    const Color activeSelection = Color(0xFF2170E4);
     const Color accentWarning = Color(0xFFEF4444);
     const Color cleanBackground = Color(0xFFF8FAFC);
 
@@ -334,24 +388,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // SECTION TAMPILAN
                         _buildSectionHeader('TAMPILAN'),
                         _buildSettingsGroupCard([
-                          _buildTileItem(
+                          SettingsToggleTile(
                             icon: Icons.dark_mode,
                             title: 'Mode Gelap',
-                            widgetTrailing: Switch(
-                              value: _isDarkMode,
-                              activeThumbColor: activeSelection,
-                              onChanged: (val) {
-                                setState(() {
-                                  _isDarkMode = val;
-                                });
-                                ScaffoldMessenger.of(context).showSnackBar(
+                            value: _isDarkMode,
+                            activeColor: const Color(0xFF2170E4),
+                            onChanged: (val) async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('is_dark_mode', val);
+                              if (mounted) {
+                                setState(() { _isDarkMode = val; });
+                                messenger.showSnackBar(
                                   SnackBar(
-                                    content: Text('Mode Gelap ${_isDarkMode ? "Aktif" : "Nonaktif"} (Simulasi)'),
+                                    content: Text('Mode Gelap ${val ? "Aktif" : "Nonaktif"}'),
                                     duration: const Duration(seconds: 1),
                                   ),
                                 );
-                              },
-                            ),
+                              }
+                            },
                           ),
                           _buildTileItem(
                             icon: Icons.translate,
@@ -402,18 +457,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             subtitle: 'Terakhir: 1 hari lalu',
                             onTap: _triggerBackup,
                           ),
-                          _buildTileItem(
+                          SettingsToggleTile(
                             icon: Icons.sync,
                             title: 'Sinkronisasi',
-                            widgetTrailing: Switch(
-                              value: _isSyncActive,
-                              activeThumbColor: activeSelection,
-                              onChanged: (val) {
-                                setState(() {
-                                  _isSyncActive = val;
-                                });
-                              },
-                            ),
+                            value: _isSyncActive,
+                            activeColor: const Color(0xFF10B981),
+                            onChanged: (val) async {
+                              final prefs = await SharedPreferences.getInstance();
+                              await prefs.setBool('is_sync_active', val);
+                              setState(() { _isSyncActive = val; });
+                            },
                           ),
                           _buildTileItem(
                             icon: Icons.delete_forever_outlined,
@@ -580,7 +633,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             const Icon(Icons.location_on, size: 12, color: Color(0xFF94A3B8)),
                             const SizedBox(width: 4),
                             Text(
-                              'Bandung, Jawa Barat',
+                              _location,
                               style: GoogleFonts.hankenGrotesk(
                                 fontSize: 10,
                                 color: const Color(0xFF94A3B8),
@@ -818,6 +871,125 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Custom Widget: SettingsToggleTile
+/// An animated settings tile with slide gesture support
+/// Slide right to activate, slide left to deactivate
+class SettingsToggleTile extends StatefulWidget {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  final Color activeColor;
+
+  const SettingsToggleTile({
+    super.key,
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.activeColor = const Color(0xFF2170E4),
+  });
+
+  @override
+  State<SettingsToggleTile> createState() => _SettingsToggleTileState();
+}
+
+class _SettingsToggleTileState extends State<SettingsToggleTile>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<Color?> _bgAnim;
+  double _dragStartX = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+      value: widget.value ? 1.0 : 0.0,
+    );
+    _bgAnim = ColorTween(
+      begin: Colors.transparent,
+      end: widget.activeColor.withValues(alpha: 0.06),
+    ).animate(_controller);
+  }
+
+  @override
+  void didUpdateWidget(SettingsToggleTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value) {
+      widget.value ? _controller.forward() : _controller.reverse();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      // Custom gesture: horizontal drag to toggle
+      onHorizontalDragStart: (details) {
+        _dragStartX = details.localPosition.dx;
+      },
+      onHorizontalDragEnd: (details) {
+        final dragDistance = details.localPosition.dx - _dragStartX;
+        if (dragDistance > 30 && !widget.value) {
+          widget.onChanged(true);
+        } else if (dragDistance < -30 && widget.value) {
+          widget.onChanged(false);
+        }
+      },
+      child: AnimatedBuilder(
+        animation: _bgAnim,
+        builder: (context, child) => Container(
+          decoration: BoxDecoration(
+            color: _bgAnim.value,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: child,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: 16.0,
+            vertical: 12.0,
+          ),
+          child: Row(
+            children: [
+              Icon(
+                widget.icon,
+                color: widget.value
+                    ? widget.activeColor
+                    : const Color(0xFF64748B),
+                size: 20,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  widget.title,
+                  style: GoogleFonts.hankenGrotesk(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              Switch(
+                value: widget.value,
+                activeThumbColor: widget.activeColor,
+                onChanged: widget.onChanged,
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

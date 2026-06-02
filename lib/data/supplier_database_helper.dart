@@ -1,96 +1,120 @@
+import 'package:sqflite/sqflite.dart';
 import '../models/supplier_model.dart';
+import 'database_helper.dart'; // Reuse the same database instance
 
 class SupplierDatabaseHelper {
+  // Singleton pattern
   SupplierDatabaseHelper._privateConstructor();
   static final SupplierDatabaseHelper instance = SupplierDatabaseHelper._privateConstructor();
 
-  final List<Supplier> _mockSuppliers = [
-    const Supplier(
-      id: '1',
-      name: 'PT Unilever Indonesia',
-      type: 'Distributor',
-      phone: '08112345678',
-      location: 'Jakarta Selatan',
-      isActive: true,
-      productCount: 15,
-    ),
-    const Supplier(
-      id: '2',
-      name: 'CV Maju Jaya Makmur',
-      type: 'Grosir',
-      phone: '08129876543',
-      location: 'Surabaya',
-      isActive: true,
-      productCount: 8,
-    ),
-    const Supplier(
-      id: '3',
-      name: 'UD Sumber Sandang',
-      type: 'Grosir',
-      phone: '08571122334',
-      location: 'Bandung',
-      isActive: false,
-      productCount: 4,
-    ),
-    const Supplier(
-      id: '4',
-      name: 'PT Indofood CBP',
-      type: 'Distributor',
-      phone: '0811888999',
-      location: 'Semarang',
-      isActive: true,
-      productCount: 22,
-    ),
-  ];
+  // Reuse database from DatabaseHelper (same .db file)
+  Future<Database> get database async => await DatabaseHelper.instance.database;
 
-  /// Query suppliers matching search keywords and segmented filter status
+  // READ with search & filter
   Future<List<Supplier>> getSuppliers({String? search, String? filter}) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    Iterable<Supplier> filtered = _mockSuppliers;
+    final db = await database;
+    String? whereClause;
+    List<dynamic>? whereArgs;
 
     if (search != null && search.trim().isNotEmpty) {
-      final query = search.trim().toLowerCase();
-      filtered = filtered.where((s) => s.name.toLowerCase().contains(query));
+      whereClause = 'LOWER(name) LIKE ?';
+      whereArgs = ['%${search.trim().toLowerCase()}%'];
     }
 
     if (filter != null && filter != 'Semua') {
-      final active = filter == 'Aktif';
-      filtered = filtered.where((s) => s.isActive == active);
+      final int activeVal = filter == 'Aktif' ? 1 : 0;
+      if (whereClause != null) {
+        whereClause += ' AND is_active = ?';
+        whereArgs!.add(activeVal);
+      } else {
+        whereClause = 'is_active = ?';
+        whereArgs = [activeVal];
+      }
     }
 
-    return filtered.toList();
+    final List<Map<String, dynamic>> maps = await db.query(
+      'suppliers',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'name ASC',
+    );
+
+    return List.generate(maps.length, (i) => _supplierFromMap(maps[i]));
   }
 
+  // AGGREGATIONS
   Future<int> getTotalSupplierCount() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.length;
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM suppliers');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> getActiveSupplierCount() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.where((s) => s.isActive).length;
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM suppliers WHERE is_active = 1');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
   Future<int> getCumulativeProductsSupplied() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.fold<int>(0, (sum, s) => sum + s.productCount);
+    final db = await database;
+    final result = await db.rawQuery('SELECT SUM(product_count) as sum FROM suppliers');
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  // CRUD
   Future<void> insertSupplier(Supplier supplier) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    _mockSuppliers.add(supplier);
+    final db = await database;
+    await db.insert(
+      'suppliers',
+      {
+        'id': supplier.id,
+        'name': supplier.name,
+        'type': supplier.type,
+        'phone': supplier.phone,
+        'location': supplier.location,
+        'is_active': supplier.isActive ? 1 : 0,
+        'product_count': supplier.productCount,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> updateSupplier(Supplier supplier) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final idx = _mockSuppliers.indexWhere((s) => s.id == supplier.id);
-    if (idx != -1) {
-      _mockSuppliers[idx] = supplier;
-    }
+    final db = await database;
+    await db.update(
+      'suppliers',
+      {
+        'name': supplier.name,
+        'type': supplier.type,
+        'phone': supplier.phone,
+        'location': supplier.location,
+        'is_active': supplier.isActive ? 1 : 0,
+        'product_count': supplier.productCount,
+      },
+      where: 'id = ?',
+      whereArgs: [supplier.id],
+    );
   }
 
   Future<void> deleteSupplier(String id) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    _mockSuppliers.removeWhere((s) => s.id == id);
+    final db = await database;
+    await db.delete(
+      'suppliers',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // HELPER — map SQLite row to Supplier model
+  Supplier _supplierFromMap(Map<String, dynamic> map) {
+    return Supplier(
+      id: map['id'] as String,
+      name: map['name'] as String,
+      type: map['type'] as String? ?? 'Lainnya',
+      phone: map['phone'] as String? ?? '',
+      location: map['location'] as String? ?? '',
+      isActive: map['is_active'] == 1,
+      productCount: map['product_count'] as int? ?? 0,
+    );
   }
 }

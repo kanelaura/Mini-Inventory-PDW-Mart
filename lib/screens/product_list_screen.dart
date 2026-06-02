@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'product_form_screen.dart';
 import '../models/product_model.dart';
 import '../data/database_helper.dart';
+import 'transaction_screen.dart';
+import 'transaction_history_screen.dart';
+import 'supplier_list_screen.dart';
+import 'settings_screen.dart';
+import 'dashboard_screen.dart';
 
 class ProductListScreen extends StatefulWidget {
-  const ProductListScreen({super.key});
+  final String? initialSearch;
+  const ProductListScreen({super.key, this.initialSearch});
 
   @override
   State<ProductListScreen> createState() => _ProductListScreenState();
@@ -19,20 +25,69 @@ class _ProductListScreenState extends State<ProductListScreen> {
   bool _sortAscending = true;
   int _currentNavIndex = 1; // "Produk" is active by default (Index 1)
 
-  final List<String> _categories = [
-    'Semua',
-    'Minuman',
-    'Makanan',
-    'Elektronik',
-    'Lainnya',
-  ];
+  List<String> _categories = ['Semua'];
 
   late Future<List<Product>> _productsFuture;
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialSearch != null && widget.initialSearch!.isNotEmpty) {
+      _searchQuery = widget.initialSearch!;
+      _searchController.text = widget.initialSearch!;
+    }
+    _loadCategories();
     _loadProducts();
+  }
+
+  Future<void> _loadCategories() async {
+    final cats = await DatabaseHelper.instance.getCategories();
+    setState(() {
+      _categories = ['Semua', ...cats.map((c) => c.name).toList()];
+    });
+  }
+
+  Future<void> _deleteProduct(Product product) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Hapus Produk',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text(
+            'Apakah kamu yakin ingin menghapus "${product.name}"?\nData tidak dapat dikembalikan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal',
+                style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Hapus',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await DatabaseHelper.instance.deleteProduct(product.id);
+      setState(() { _loadProducts(); });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} berhasil dihapus'),
+            backgroundColor: const Color(0xFF10B981),
+          ),
+        );
+      }
+    }
   }
 
   void _loadProducts() {
@@ -424,21 +479,23 @@ class _ProductListScreenState extends State<ProductListScreen> {
       badgeText = 'Habis';
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12.0),
-      padding: const EdgeInsets.all(12.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.02),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+    return GestureDetector(
+      onLongPress: () => _deleteProduct(product),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12.0),
+        padding: const EdgeInsets.all(12.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -514,7 +571,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
           // Right: Badges & Edit Trigger
           SizedBox(
-            height: 80,
+            height: 110,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               crossAxisAlignment: CrossAxisAlignment.end,
@@ -538,7 +595,10 @@ class _ProductListScreenState extends State<ProductListScreen> {
                     ),
                   ),
                 ),
-
+                ProductStockIndicator(
+                  stock: product.stock,
+                  maxStock: product.minStockAlert * 4,
+                ),
                 // Right Bottom: Edit Action trigger icon
                 GestureDetector(
                   onTap: () {
@@ -575,8 +635,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   /// Modern persistent bottom navigation bar
   Widget _buildBottomNavigationBar({
@@ -617,17 +678,27 @@ class _ProductListScreenState extends State<ProductListScreen> {
               return InkWell(
                 onTap: () {
                   if (index == 0) {
-                    Navigator.pop(context); // Go back to Home
-                  } else {
-                    setState(() {
-                      _currentNavIndex = index;
-                    });
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Navigasi ke menu ${item.label} (Mock)'),
-                        duration: const Duration(seconds: 1),
-                      ),
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                      (route) => false,
+                    );
+                  } else if (index == 1) {
+                    setState(() { _currentNavIndex = index; });
+                  } else if (index == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const TransactionScreen()),
+                    ).then((_) => setState(() { _loadProducts(); }));
+                  } else if (index == 3) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SupplierListScreen()),
+                    );
+                  } else if (index == 4) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
                     );
                   }
                 },
@@ -686,6 +757,100 @@ class _ProductListScreenState extends State<ProductListScreen> {
       ),
     );
   }
+}
+
+/// Custom Widget: ProductStockIndicator
+/// Uses CustomPainter to draw a circular stock level arc indicator
+class ProductStockIndicator extends StatelessWidget {
+  final int stock;
+  final int maxStock;
+
+  const ProductStockIndicator({
+    super.key,
+    required this.stock,
+    required this.maxStock,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size(36, 36),
+      painter: _StockArcPainter(
+        stock: stock,
+        maxStock: maxStock,
+      ),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Center(
+          child: Text(
+            '$stock',
+            style: const TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF0F172A),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StockArcPainter extends CustomPainter {
+  final int stock;
+  final int maxStock;
+
+  _StockArcPainter({required this.stock, required this.maxStock});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2 - 3;
+    const strokeWidth = 4.0;
+
+    // Background arc (grey track)
+    final bgPaint = Paint()
+      ..color = const Color(0xFFE2E8F0)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawCircle(center, radius, bgPaint);
+
+    // Determine arc color based on stock level
+    Color arcColor;
+    final ratio = maxStock > 0 ? stock / maxStock : 0.0;
+    if (stock == 0) {
+      arcColor = const Color(0xFFEF4444);
+    } else if (stock <= 5) {
+      arcColor = const Color(0xFFF59E0B);
+    } else {
+      arcColor = const Color(0xFF10B981);
+    }
+
+    // Foreground arc (stock level)
+    final fgPaint = Paint()
+      ..color = arcColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+
+    const startAngle = -3.14159 / 2; // Start from top
+    final sweepAngle = 2 * 3.14159 * ratio.clamp(0.0, 1.0);
+
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      sweepAngle,
+      false,
+      fgPaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_StockArcPainter oldDelegate) =>
+      oldDelegate.stock != stock || oldDelegate.maxStock != maxStock;
 }
 
 class _BottomNavItem {

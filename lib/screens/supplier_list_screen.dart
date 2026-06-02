@@ -1,146 +1,10 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'product_list_screen.dart';
 import 'transaction_screen.dart';
-
-/// Supplier model class matching expected SQLite schema fields
-class Supplier {
-  final String id;
-  final String name;
-  final String type; // e.g. 'Distributor', 'Grosir', 'Agen', 'Lainnya'
-  final String phone;
-  final String location;
-  final bool isActive;
-  final int productCount;
-
-  const Supplier({
-    required this.id,
-    required this.name,
-    required this.type,
-    required this.phone,
-    required this.location,
-    required this.isActive,
-    required this.productCount,
-  });
-
-  Supplier copyWith({
-    String? id,
-    String? name,
-    String? type,
-    String? phone,
-    String? location,
-    bool? isActive,
-    int? productCount,
-  }) {
-    return Supplier(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      type: type ?? this.type,
-      phone: phone ?? this.phone,
-      location: location ?? this.location,
-      isActive: isActive ?? this.isActive,
-      productCount: productCount ?? this.productCount,
-    );
-  }
-}
-
-/// SQLite Database Helper mock local to Supplier module to avoid compile-time collisions
-class SupplierDatabaseHelper {
-  SupplierDatabaseHelper._privateConstructor();
-  static final SupplierDatabaseHelper instance =
-      SupplierDatabaseHelper._privateConstructor();
-
-  final List<Supplier> _mockSuppliers = [
-    const Supplier(
-      id: '1',
-      name: 'PT Unilever Indonesia',
-      type: 'Distributor',
-      phone: '08112345678',
-      location: 'Jakarta Selatan',
-      isActive: true,
-      productCount: 15,
-    ),
-    const Supplier(
-      id: '2',
-      name: 'CV Maju Jaya Makmur',
-      type: 'Grosir',
-      phone: '08129876543',
-      location: 'Surabaya',
-      isActive: true,
-      productCount: 8,
-    ),
-    const Supplier(
-      id: '3',
-      name: 'UD Sumber Sandang',
-      type: 'Grosir',
-      phone: '08571122334',
-      location: 'Bandung',
-      isActive: false,
-      productCount: 4,
-    ),
-    const Supplier(
-      id: '4',
-      name: 'PT Indofood CBP',
-      type: 'Distributor',
-      phone: '0811888999',
-      location: 'Semarang',
-      isActive: true,
-      productCount: 22,
-    ),
-  ];
-
-  /// Query suppliers matching search keywords and segmented filter status
-  Future<List<Supplier>> getSuppliers({String? search, String? filter}) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    Iterable<Supplier> filtered = _mockSuppliers;
-
-    if (search != null && search.trim().isNotEmpty) {
-      final query = search.trim().toLowerCase();
-      filtered = filtered.where((s) => s.name.toLowerCase().contains(query));
-    }
-
-    if (filter != null && filter != 'Semua') {
-      final active = filter == 'Aktif';
-      filtered = filtered.where((s) => s.isActive == active);
-    }
-
-    return filtered.toList();
-  }
-
-  Future<int> getTotalSupplierCount() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.length;
-  }
-
-  Future<int> getActiveSupplierCount() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.where((s) => s.isActive).length;
-  }
-
-  Future<int> getCumulativeProductsSupplied() async {
-    await Future.delayed(const Duration(milliseconds: 50));
-    return _mockSuppliers.fold<int>(0, (sum, s) => sum + s.productCount);
-  }
-
-  Future<void> insertSupplier(Supplier supplier) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    _mockSuppliers.add(supplier);
-  }
-
-  Future<void> updateSupplier(Supplier supplier) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final idx = _mockSuppliers.indexWhere((s) => s.id == supplier.id);
-    if (idx != -1) {
-      _mockSuppliers[idx] = supplier;
-    }
-  }
-
-  Future<void> deleteSupplier(String id) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    _mockSuppliers.removeWhere((s) => s.id == id);
-  }
-}
+import '../models/supplier_model.dart';
+import '../data/supplier_database_helper.dart';
+import 'settings_screen.dart';
 
 class SupplierListScreen extends StatefulWidget {
   const SupplierListScreen({super.key});
@@ -1074,27 +938,10 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
               Row(
                 children: [
                   // round gradient circle enclosing acronym initials
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [primaryTheme, containerSlate.withOpacity(0.8)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        initials,
-                        style: GoogleFonts.hankenGrotesk(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
+                  SupplierAvatarWidget(
+                    initials: initials,
+                    isActive: s.isActive,
+                    onLongPress: () => _showOptionsSheet(s),
                   ),
                   const SizedBox(width: 12),
 
@@ -1347,7 +1194,10 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                 },
               ),
               _buildNavItem(Icons.settings_outlined, 'Settings', false, () {
-                _showNavMockMessage('Settings');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
               }),
             ],
           ),
@@ -1396,16 +1246,129 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     );
   }
 
-  void _showNavMockMessage(String label) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Navigasi ke menu $label (Mock)'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
+}
+
+/// Custom Widget: SupplierAvatarWidget
+/// Displays supplier initials avatar with long-press gesture
+/// that shows a ripple animation and triggers options sheet
+class SupplierAvatarWidget extends StatefulWidget {
+  final String initials;
+  final bool isActive;
+  final VoidCallback onLongPress;
+
+  const SupplierAvatarWidget({
+    super.key,
+    required this.initials,
+    required this.isActive,
+    required this.onLongPress,
+  });
+
+  @override
+  State<SupplierAvatarWidget> createState() => _SupplierAvatarWidgetState();
+}
+
+class _SupplierAvatarWidgetState extends State<SupplierAvatarWidget>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+  late Animation<double> _opacityAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 1.2).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.elasticOut),
+    );
+    _opacityAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _handleLongPress() {
+    _controller.forward().then((_) => _controller.reverse());
+    widget.onLongPress();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Color primaryTheme = const Color(0xFF00236F);
+    final Color containerSlate = const Color(0xFF2170E4);
+    final Color accentSuccess = const Color(0xFF10B981);
+    final Color alertRed = const Color(0xFFEF4444);
+
+    return GestureDetector(
+      onLongPress: _handleLongPress,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              // Ripple circle behind avatar
+              Transform.scale(
+                scale: _scaleAnim.value,
+                child: Opacity(
+                  opacity: _opacityAnim.value * 0.3,
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: widget.isActive ? accentSuccess : alertRed,
+                    ),
+                  ),
+                ),
+              ),
+              // Main avatar
+              Transform.scale(
+                scale: _scaleAnim.value * 0.9 + 0.1,
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        primaryTheme,
+                        containerSlate.withOpacity(0.8),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: widget.isActive
+                          ? accentSuccess.withOpacity(0.5)
+                          : alertRed.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      widget.initials,
+                      style: GoogleFonts.hankenGrotesk(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -1442,7 +1405,7 @@ class DashedBorderPainter extends CustomPainter {
 
     final dashPath = Path();
     double distance = 0.0;
-    for (final PathMetric metric in path.computeMetrics()) {
+    for (final metric in path.computeMetrics()) {
       while (distance < metric.length) {
         dashPath.addPath(
           metric.extractPath(

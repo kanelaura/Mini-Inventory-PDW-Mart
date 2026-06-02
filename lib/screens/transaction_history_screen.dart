@@ -1,8 +1,9 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../data/database_helper.dart';
 import 'transaction_screen.dart';
 import 'product_list_screen.dart';
+import 'supplier_list_screen.dart';
+import 'settings_screen.dart';
 
 class TransactionHistoryScreen extends StatefulWidget {
   const TransactionHistoryScreen({super.key});
@@ -20,6 +21,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   String _selectedFilter =
       'Semua'; // 'Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Custom'
   DateTimeRange? _customDateRange;
+  String? _statusFilter; // null = semua status
 
   bool _isLoading = true;
 
@@ -43,6 +45,13 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     super.dispose();
   }
 
+  void _applyStatusFilter(String? status) {
+    setState(() {
+      _statusFilter = status;
+    });
+    _loadAllData();
+  }
+
   /// Reloads all reports and lists matching search / filter parameters
   Future<void> _loadAllData() async {
     setState(() {
@@ -61,6 +70,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
         search: _searchQuery,
         dateFilter: _selectedFilter,
         customDateRange: _customDateRange,
+        statusFilter: _statusFilter,
       );
 
       // Group chronologically
@@ -331,14 +341,26 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                           color: Colors.white,
                         ),
                       ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.filter_list,
-                          color: Colors.white,
-                        ),
-                        onPressed: () {
-                          _showFilterOptionsModal();
-                        },
+                      Stack(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.filter_list, color: Colors.white),
+                            onPressed: _showFilterOptionsModal,
+                          ),
+                          if (_statusFilter != null)
+                            Positioned(
+                              right: 8,
+                              top: 8,
+                              child: Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFF59E0B),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ],
                   ),
@@ -669,7 +691,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
           keys.length + 1, // Add 1 for the dashed footer button at the end
       itemBuilder: (context, index) {
         if (index == keys.length) {
-          return _buildDashedFooterButton(primaryContainer);
+          return AnimatedDashedButton(
+            borderColor: primaryContainer.withOpacity(0.5),
+            onTap: () {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Menampilkan transaksi lebih lama'),
+                  ),
+                );
+              }
+            },
+          );
         }
 
         final key = keys[index];
@@ -865,48 +898,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Dashed Border Button "Lihat Transaksi Sebelumnya"
-  Widget _buildDashedFooterButton(Color primaryContainer) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      height: 52,
-      child: CustomPaint(
-        painter: DashedBorderPainter(
-          color: primaryContainer.withOpacity(0.4),
-          borderRadius: 12.0,
-          gap: 6.0,
-          dashLength: 8.0,
-        ),
-        child: InkWell(
-          onTap: () {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Menampilkan transaksi lebih lama (Simulasi)'),
-                ),
-              );
-            }
-          },
-          borderRadius: BorderRadius.circular(12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Lihat Transaksi Sebelumnya',
-                style: TextStyle(
-                  color: Color(0xFF1E3A8A),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(Icons.expand_more, color: primaryContainer, size: 20),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+
 
   /// System Navigation Bar
   Widget _buildSystemNavigationBar(Color primaryContainer) {
@@ -958,11 +950,17 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                 'Supplier',
                 false,
                 () {
-                  _showNavMockMessage('Supplier');
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const SupplierListScreen()),
+                  );
                 },
               ),
               _buildNavItem(Icons.settings_outlined, 'Settings', false, () {
-                _showNavMockMessage('Settings');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                );
               }),
             ],
           ),
@@ -1011,17 +1009,6 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  void _showNavMockMessage(String label) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Navigasi ke menu $label (Mock)'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
-  }
 
   /// Trailing filter options bottom modal sheet
   void _showFilterOptionsModal() {
@@ -1050,6 +1037,18 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
               ),
               const SizedBox(height: 16),
               ListTile(
+                leading: const Icon(Icons.list_alt, color: Color(0xFF1E3A8A)),
+                title: const Text('Semua Status',
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                trailing: _statusFilter == null
+                    ? const Icon(Icons.check, color: Color(0xFF10B981))
+                    : null,
+                onTap: () {
+                  Navigator.pop(context);
+                  _applyStatusFilter(null);
+                },
+              ),
+              ListTile(
                 leading: const Icon(
                   Icons.check_circle_outline,
                   color: Color(0xFF2E7D32),
@@ -1058,12 +1057,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   'Selesai',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
+                trailing: _statusFilter == 'Selesai'
+                    ? const Icon(Icons.check, color: Color(0xFF10B981))
+                    : null,
                 onTap: () {
-                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Menyaring status Selesai')),
-                  );
+                  _applyStatusFilter('Selesai');
                 },
               ),
               ListTile(
@@ -1075,14 +1074,12 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   'Dibatalkan',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
+                trailing: _statusFilter == 'Dibatalkan'
+                    ? const Icon(Icons.check, color: Color(0xFF10B981))
+                    : null,
                 onTap: () {
-                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
-                  messenger.showSnackBar(
-                    const SnackBar(
-                      content: Text('Menyaring status Dibatalkan'),
-                    ),
-                  );
+                  _applyStatusFilter('Dibatalkan');
                 },
               ),
               ListTile(
@@ -1094,18 +1091,107 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
                   'Pending',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
+                trailing: _statusFilter == 'Pending'
+                    ? const Icon(Icons.check, color: Color(0xFF10B981))
+                    : null,
                 onTap: () {
-                  final messenger = ScaffoldMessenger.of(context);
                   Navigator.pop(context);
-                  messenger.showSnackBar(
-                    const SnackBar(content: Text('Menyaring status Pending')),
-                  );
+                  _applyStatusFilter('Pending');
                 },
               ),
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// Custom Widget: AnimatedDashedButton
+/// A button with dashed border using CustomPainter and
+/// scale animation gesture feedback
+class AnimatedDashedButton extends StatefulWidget {
+  final VoidCallback onTap;
+  final Color borderColor;
+
+  const AnimatedDashedButton({
+    super.key,
+    required this.onTap,
+    required this.borderColor,
+  });
+
+  @override
+  State<AnimatedDashedButton> createState() => _AnimatedDashedButtonState();
+}
+
+class _AnimatedDashedButtonState extends State<AnimatedDashedButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+      lowerBound: 0.0,
+      upperBound: 1.0,
+    );
+    _scaleAnim = Tween<double>(begin: 1.0, end: 0.96).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) => _controller.forward(),
+      onTapUp: (_) {
+        _controller.reverse();
+        widget.onTap();
+      },
+      onTapCancel: () => _controller.reverse(),
+      child: AnimatedBuilder(
+        animation: _scaleAnim,
+        builder: (context, child) => Transform.scale(
+          scale: _scaleAnim.value,
+          child: child,
+        ),
+        child: Container(
+          height: 52,
+          margin: const EdgeInsets.symmetric(vertical: 16),
+          child: CustomPaint(
+            painter: DashedBorderPainter(
+              color: widget.borderColor,
+              borderRadius: 12.0,
+              gap: 6.0,
+              dashLength: 8.0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Lihat Transaksi Sebelumnya',
+                  style: TextStyle(
+                    color: widget.borderColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.expand_more, color: widget.borderColor, size: 20),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1143,7 +1229,7 @@ class DashedBorderPainter extends CustomPainter {
 
     final dashPath = Path();
     double distance = 0.0;
-    for (final PathMetric metric in path.computeMetrics()) {
+    for (final metric in path.computeMetrics()) {
       while (distance < metric.length) {
         dashPath.addPath(
           metric.extractPath(

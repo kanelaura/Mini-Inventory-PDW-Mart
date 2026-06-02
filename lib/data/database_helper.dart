@@ -1,408 +1,510 @@
 import 'package:flutter/material.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:path/path.dart';
 import '../models/product_model.dart';
 import '../models/transaction_model.dart';
 import '../models/category_model.dart';
+import 'supplier_database_helper.dart';
 
 class DatabaseHelper {
+  // Singleton pattern
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
+  static Database? _database;
 
-  Future<dynamic> get database async {
-    // Simulated SQLite initialization delay
-    await Future.delayed(const Duration(milliseconds: 600));
-    return null;
+  // Cached product count per category for synchronous UI helper
+  final Map<String, int> _categoryProductCounts = {};
+
+  Future<Database> get database async {
+    if (_database != null) return _database!;
+    _database = await _initDatabase();
+    return _database!;
   }
 
-  // Central in-memory product database table
-  final List<Product> _mockDatabase = [
-    const Product(
-        id: '1',
-        name: 'Minyak Goreng Sunco 2L',
-        category: 'Lainnya',
-        stock: 2,
-        price: 38000,
-        supplier: 'Indofood',
-        sku: 'MNG-SNC-2L',
-        satuan: 'pcs',
-        hargaBeli: 34000,
-        minStockAlert: 5,
-        lokasiRak: 'A-12-3',
-        description: 'Minyak goreng kelapa sawit berkualitas tinggi.'),
-    const Product(
-        id: '2',
-        name: 'Susu UHT Ultra Milk 1L',
-        category: 'Minuman',
-        stock: 24,
-        price: 18500,
-        supplier: 'Ultra Jaya',
-        sku: 'SSU-ULT-1L',
-        satuan: 'box',
-        hargaBeli: 15000,
-        minStockAlert: 10,
-        lokasiRak: 'B-02-1',
-        description: 'Susu UHT rasa tawar kaya nutrisi.'),
-    const Product(
-        id: '3',
-        name: 'Indomie Goreng Spontan',
-        category: 'Makanan',
-        stock: 4,
-        price: 3500,
-        supplier: 'Indofood',
-        sku: 'IDM-GRG-SP',
-        satuan: 'pcs',
-        hargaBeli: 2800,
-        minStockAlert: 10,
-        lokasiRak: 'A-01-2',
-        description: 'Mie instan goreng favorit masyarakat.'),
-    const Product(
-        id: '4',
-        name: 'Gula Pasir Gulaku 1kg',
-        category: 'Lainnya',
-        stock: 8,
-        price: 16000,
-        supplier: 'Gulaku Corp',
-        sku: 'GLK-PSR-1K',
-        satuan: 'pcs',
-        hargaBeli: 13500,
-        minStockAlert: 5,
-        lokasiRak: 'A-12-4',
-        description: 'Gula tebu murni pilihan berkualitas.'),
-    const Product(
-        id: '5',
-        name: 'Coca Cola 250ml',
-        category: 'Minuman',
-        stock: 15,
-        price: 5000,
-        supplier: 'Coca Cola Amatil',
-        sku: 'COL-CAN-25',
-        satuan: 'pcs',
-        hargaBeli: 3800,
-        minStockAlert: 8,
-        lokasiRak: 'B-03-2',
-        description: 'Minuman berkarbonasi rasa cola menyegarkan.'),
-    const Product(
-        id: '6',
-        name: 'Kopi Kapal Api 165g',
-        category: 'Minuman',
-        stock: 0,
-        price: 12500,
-        supplier: 'Santos Jaya Abadi',
-        sku: 'KPI-KPL-16',
-        satuan: 'pack',
-        hargaBeli: 10200,
-        minStockAlert: 5,
-        lokasiRak: 'A-04-1',
-        description: 'Kopi bubuk hitam mantap dengan gula.'),
-    const Product(
-        id: '7',
-        name: 'Chitato Sapi Panggang',
-        category: 'Makanan',
-        stock: 11,
-        price: 9500,
-        supplier: 'Indofood',
-        sku: 'CTT-SPG-68',
-        satuan: 'pcs',
-        hargaBeli: 7900,
-        minStockAlert: 10,
-        lokasiRak: 'A-01-3',
-        description: 'Keripik kentang rasa sapi panggang.'),
-    const Product(
-        id: '8',
-        name: 'Kabel Charger Type-C',
-        category: 'Elektronik',
-        stock: 20,
-        price: 25000,
-        supplier: 'Baseus',
-        sku: 'KBL-TYP-C1',
-        satuan: 'pcs',
-        hargaBeli: 15000,
-        minStockAlert: 3,
-        lokasiRak: 'E-01-1',
-        description: 'Kabel charger fast charging Type-C panjang 1m.'),
-    const Product(
-        id: '9',
-        name: 'Stopkontak 5 Lubang',
-        category: 'Elektronik',
-        stock: 3,
-        price: 45000,
-        supplier: 'Broco',
-        sku: 'STP-BRC-5L',
-        satuan: 'pcs',
-        hargaBeli: 32000,
-        minStockAlert: 2,
-        lokasiRak: 'E-02-3',
-        description: 'Stopkontak 5 lubang standar SNI.'),
-  ];
-
-  // In-memory mock transactions database table
-  final List<Map<String, dynamic>> _mockTransactions = [
-    {
-      'id': 'TRX-20260602-101',
-      'total_pay': 38000.0,
-      'discount': 0.0,
-      'status': 'Selesai',
-      'timestamp': DateTime.now().subtract(const Duration(minutes: 15)),
-      'items': [
-        {'name': 'Minyak Goreng Sunco 2L', 'quantity': 1, 'price': 38000.0},
-      ]
-    },
-    {
-      'id': 'TRX-20260602-102',
-      'total_pay': 74000.0,
-      'discount': 2000.0,
-      'status': 'Selesai',
-      'timestamp': DateTime.now().subtract(const Duration(hours: 1)),
-      'items': [
-        {'name': 'Susu UHT Ultra Milk 1L', 'quantity': 2, 'price': 18500.0},
-        {'name': 'Chitato Sapi Panggang', 'quantity': 4, 'price': 9500.0},
-      ]
-    },
-    {
-      'id': 'TRX-20260601-201',
-      'total_pay': 10500.0,
-      'discount': 0.0,
-      'status': 'Selesai',
-      'timestamp': DateTime.now().subtract(const Duration(days: 1, hours: 2)),
-      'items': [
-        {'name': 'Indomie Goreng Spontan', 'quantity': 3, 'price': 3500.0},
-      ]
-    },
-    {
-      'id': 'TRX-20260531-301',
-      'total_pay': 45000.0,
-      'discount': 5000.0,
-      'status': 'Pending',
-      'timestamp': DateTime.now().subtract(const Duration(days: 2, hours: 4)),
-      'items': [
-        {'name': 'Stopkontak 5 Lubang', 'quantity': 1, 'price': 45000.0},
-      ]
-    },
-    {
-      'id': 'TRX-20260528-401',
-      'total_pay': 50000.0,
-      'discount': 0.0,
-      'status': 'Dibatalkan',
-      'timestamp': DateTime.now().subtract(const Duration(days: 5, hours: 1)),
-      'items': [
-        {'name': 'Kabel Charger Type-C', 'quantity': 2, 'price': 25000.0},
-      ]
-    },
-    {
-      'id': 'TRX-20260515-501',
-      'total_pay': 32000.0,
-      'discount': 0.0,
-      'status': 'Selesai',
-      'timestamp': DateTime.now().subtract(const Duration(days: 18)),
-      'items': [
-        {'name': 'Gula Pasir Gulaku 1kg', 'quantity': 2, 'price': 16000.0},
-      ]
-    }
-  ];
-
-  // In-memory mock categories database table
-  final List<CategoryModel> _mockCategories = [
-    CategoryModel(id: '1', name: 'Minuman', emoji: '🥤', modifiedAt: DateTime.now().subtract(const Duration(minutes: 5))),
-    CategoryModel(id: '2', name: 'Makanan', emoji: '🍱', modifiedAt: DateTime.now().subtract(const Duration(hours: 1))),
-    CategoryModel(id: '3', name: 'Elektronik', emoji: '⚡', modifiedAt: DateTime.now().subtract(const Duration(hours: 3))),
-    CategoryModel(id: '4', name: 'Lainnya', emoji: '📦', modifiedAt: DateTime.now().subtract(const Duration(days: 1))),
-  ];
-
-  /// Gets the total products count (Mock SQLite aggregation query)
-  Future<int> getTotalProductsCount() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    return _mockDatabase.length; 
+  Future<Database> _initDatabase() async {
+    final dbPath = await getDatabasesPath();
+    final path = join(dbPath, 'pdw_mart.db');
+    return await openDatabase(
+      path,
+      version: 1,
+      onCreate: _onCreate,
+    );
   }
 
-  /// Gets the count of low stock products (Mock SQLite aggregation query)
-  Future<int> getLowStockCount({int threshold = 5}) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    return _mockDatabase.where((p) => p.stock <= threshold).length;
+  Future<void> _onCreate(Database db, int version) async {
+    // 1. Create products table
+    await db.execute('''
+      CREATE TABLE products (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        category TEXT,
+        stock INTEGER DEFAULT 0,
+        price REAL DEFAULT 0,
+        supplier TEXT,
+        sku TEXT,
+        satuan TEXT,
+        harga_beli REAL DEFAULT 0,
+        min_stock_alert INTEGER DEFAULT 5,
+        lokasi_rak TEXT,
+        description TEXT,
+        image_url TEXT
+      )
+    ''');
+
+    // 2. Create categories table
+    await db.execute('''
+      CREATE TABLE categories (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        emoji TEXT,
+        modified_at TEXT
+      )
+    ''');
+
+    // 3. Create transactions table
+    await db.execute('''
+      CREATE TABLE transactions (
+        id TEXT PRIMARY KEY,
+        total_pay REAL,
+        discount REAL DEFAULT 0,
+        status TEXT,
+        note TEXT,
+        timestamp TEXT
+      )
+    ''');
+
+    // 4. Create transaction_items table
+    await db.execute('''
+      CREATE TABLE transaction_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        transaction_id TEXT,
+        product_name TEXT,
+        quantity INTEGER,
+        price REAL,
+        FOREIGN KEY (transaction_id) REFERENCES transactions(id)
+      )
+    ''');
+
+    // 5. Create suppliers table
+    await db.execute('''
+      CREATE TABLE suppliers (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        type TEXT,
+        phone TEXT,
+        location TEXT,
+        is_active INTEGER DEFAULT 1,
+        product_count INTEGER DEFAULT 0
+      )
+    ''');
+
+    // Seed default categories
+    final now = DateTime.now().toIso8601String();
+    await db.insert('categories', {'id': '1', 'name': 'Minuman', 'emoji': '🥤', 'modified_at': now});
+    await db.insert('categories', {'id': '2', 'name': 'Makanan', 'emoji': '🍱', 'modified_at': now});
+    await db.insert('categories', {'id': '3', 'name': 'Elektronik', 'emoji': '⚡', 'modified_at': now});
+    await db.insert('categories', {'id': '4', 'name': 'Lainnya', 'emoji': '📦', 'modified_at': now});
+    await db.insert('categories', {'id': '5', 'name': 'Kebersihan', 'emoji': '🧹', 'modified_at': now});
+
+    // Seed default suppliers
+    await db.insert('suppliers', {
+      'id': '1',
+      'name': 'PT Unilever Indonesia',
+      'type': 'Distributor',
+      'phone': '08112345678',
+      'location': 'Jakarta Selatan',
+      'is_active': 1,
+      'product_count': 15
+    });
+    await db.insert('suppliers', {
+      'id': '2',
+      'name': 'CV Maju Jaya Makmur',
+      'type': 'Grosir',
+      'phone': '08129876543',
+      'location': 'Surabaya',
+      'is_active': 1,
+      'product_count': 8
+    });
+    await db.insert('suppliers', {
+      'id': '3',
+      'name': 'UD Sumber Sandang',
+      'type': 'Grosir',
+      'phone': '08571122334',
+      'location': 'Bandung',
+      'is_active': 0,
+      'product_count': 4
+    });
+    await db.insert('suppliers', {
+      'id': '4',
+      'name': 'PT Indofood CBP',
+      'type': 'Distributor',
+      'phone': '0811888999',
+      'location': 'Semarang',
+      'is_active': 1,
+      'product_count': 22
+    });
   }
 
-  /// Gets the total transaction count for today (Mock SQLite aggregation query)
-  Future<int> getTodayTransactionsCount() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final now = DateTime.now();
-    final startOfToday = DateTime(now.year, now.month, now.day);
-    return _mockTransactions.where((tx) {
-      final ts = tx['timestamp'] as DateTime;
-      return ts.isAfter(startOfToday) || ts.isAtSameMomentAs(startOfToday);
-    }).length;
-  }
+  // --- PRODUCTS CRUD ---
 
-  /// Gets the total suppliers count (Mock SQLite aggregation query)
-  Future<int> getSuppliersCount() async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    return 8;
-  }
-
-  /// Gets list of products with low stock (Mock SQLite list query)
-  Future<List<Product>> getLowStockItems() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    return _mockDatabase.where((p) => p.stock <= 5).toList();
-  }
-
-  /// Gets recent transaction records (Mock SQLite list query)
-  Future<List<TransactionItem>> getRecentTransactions() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final List<TransactionItem> list = [];
-    int limit = 5;
-    for (final tx in _mockTransactions) {
-      final items = tx['items'] as List;
-      final ts = tx['timestamp'] as DateTime;
-      final status = tx['status'] as String;
-      if (status != 'Selesai') continue;
-      for (final item in items) {
-        if (list.length >= limit) break;
-        list.add(TransactionItem(
-          id: tx['id'] as String,
-          productName: item['name'] as String,
-          dateTime: ts,
-          quantityChange: -(item['quantity'] as int),
-          type: 'sale',
-        ));
-      }
-      if (list.length >= limit) break;
-    }
-    return list;
-  }
-
-  /// Query products matching search keywords and category (corresponds to SQLite:
-  /// SELECT * FROM products WHERE name LIKE %query% AND category = selectedCategory ORDER BY name ASC/DESC)
-  Future<List<Product>> getProducts({
-    String? search,
-    String? category,
-    bool sortAscending = true,
-  }) async {
-    // Simulating database query delay
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    Iterable<Product> filtered = _mockDatabase;
+  Future<List<Product>> getProducts({String? search, String? category, bool sortAscending = true}) async {
+    final db = await database;
+    String? whereClause;
+    List<dynamic>? whereArgs;
 
     if (search != null && search.trim().isNotEmpty) {
-      final query = search.trim().toLowerCase();
-      filtered = filtered.where((p) =>
-          p.name.toLowerCase().contains(query) ||
-          p.supplier.toLowerCase().contains(query));
+      final query = '%${search.trim().toLowerCase()}%';
+      whereClause = '(LOWER(name) LIKE ? OR LOWER(supplier) LIKE ?)';
+      whereArgs = [query, query];
     }
 
     if (category != null && category != 'Semua') {
-      filtered = filtered.where((p) => p.category == category);
+      if (whereClause != null) {
+        whereClause += ' AND category = ?';
+        whereArgs!.add(category);
+      } else {
+        whereClause = 'category = ?';
+        whereArgs = [category];
+      }
     }
 
-    final sortedList = filtered.toList();
-    if (sortAscending) {
-      sortedList.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    } else {
-      sortedList.sort((a, b) => b.name.toLowerCase().compareTo(a.name.toLowerCase()));
-    }
+    final orderBy = 'name ${sortAscending ? "ASC" : "DESC"}';
 
-    return sortedList;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'products',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: orderBy,
+    );
+
+    return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
   }
 
-  /// SQLite CRUD Create Operation Simulation
   Future<void> insertProduct(Product product) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    _mockDatabase.add(product);
+    final db = await database;
+    await db.insert(
+      'products',
+      product.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
-  /// SQLite CRUD Update Operation Simulation
   Future<void> updateProduct(Product product) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final idx = _mockDatabase.indexWhere((p) => p.id == product.id);
-    if (idx != -1) {
-      _mockDatabase[idx] = product;
-    }
+    final db = await database;
+    await db.update(
+      'products',
+      product.toMap(),
+      where: 'id = ?',
+      whereArgs: [product.id],
+    );
   }
 
-  /// SQLite Master-Detail Relational Write Transaction and Stock Reduction Simulation
+  Future<void> deleteProduct(String id) async {
+    final db = await database;
+    await db.delete(
+      'products',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<Product?> getProductById(String id) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'products',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+
+    if (maps.isNotEmpty) {
+      return Product.fromMap(maps.first);
+    }
+    return null;
+  }
+
+  // --- PRODUCTS AGGREGATIONS ---
+
+  Future<int> getTotalProductsCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM products');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getTotalProductCount() => getTotalProductsCount();
+
+  Future<int> getLowStockCount({int threshold = 5}) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products WHERE stock <= ?',
+      [threshold],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<List<Product>> getLowStockItems({int threshold = 5}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> maps = await db.query(
+      'products',
+      where: 'stock <= ?',
+      whereArgs: [threshold],
+      orderBy: 'stock ASC',
+    );
+    return List.generate(maps.length, (i) => Product.fromMap(maps[i]));
+  }
+
+  // --- CATEGORIES CRUD ---
+
+  Future<List<CategoryModel>> getCategories({String? search}) async {
+    final db = await database;
+    
+    // Fetch product counts dynamically to populate cache for getProductCount
+    final List<Map<String, dynamic>> countMaps = await db.rawQuery(
+      'SELECT category, COUNT(*) as count FROM products GROUP BY category'
+    );
+    _categoryProductCounts.clear();
+    for (final row in countMaps) {
+      final cat = row['category'] as String? ?? '';
+      final count = row['count'] as int? ?? 0;
+      _categoryProductCounts[cat] = count;
+    }
+
+    String? whereClause;
+    List<dynamic>? whereArgs;
+
+    if (search != null && search.trim().isNotEmpty) {
+      whereClause = 'LOWER(name) LIKE ?';
+      whereArgs = ['%${search.trim().toLowerCase()}%'];
+    }
+
+    final List<Map<String, dynamic>> maps = await db.query(
+      'categories',
+      where: whereClause,
+      whereArgs: whereArgs,
+      orderBy: 'name ASC',
+    );
+
+    return List.generate(maps.length, (i) {
+      return CategoryModel(
+        id: maps[i]['id'] as String,
+        name: maps[i]['name'] as String,
+        emoji: maps[i]['emoji'] as String? ?? '📦',
+        modifiedAt: DateTime.parse(maps[i]['modified_at'] as String),
+      );
+    });
+  }
+
+  Future<void> insertCategory(String name) async {
+    final db = await database;
+    final id = DateTime.now().millisecondsSinceEpoch.toString();
+    final emoji = _getEmojiForCategory(name);
+    await db.insert('categories', {
+      'id': id,
+      'name': name,
+      'emoji': emoji,
+      'modified_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> updateCategory(String id, String newName) async {
+    final db = await database;
+    final emoji = _getEmojiForCategory(newName);
+    await db.update(
+      'categories',
+      {
+        'name': newName,
+        'emoji': emoji,
+        'modified_at': DateTime.now().toIso8601String(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    final db = await database;
+    await db.delete(
+      'categories',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> getCategoryCount() async {
+    final db = await database;
+    final result = await db.rawQuery('SELECT COUNT(*) as count FROM categories');
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  Future<int> getProductCountForCategory(String categoryName) async {
+    final db = await database;
+    final result = await db.rawQuery(
+      'SELECT COUNT(*) as count FROM products WHERE category = ?',
+      [categoryName],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
+  }
+
+  // Synchronous lookup from cached category counts (used in categories screen UI builder)
+  int getProductCount(String categoryName) {
+    return _categoryProductCounts[categoryName] ?? 0;
+  }
+
+  // --- TRANSACTIONS & REPORTING ---
+
   Future<void> processTransaction({
     required String invoiceId,
     required double totalPay,
     required double discount,
+    String note = '',
     required List<Map<String, dynamic>> cartItems,
   }) async {
-    // Simulate database write delay
-    await Future.delayed(const Duration(milliseconds: 300));
+    final db = await database;
+    await db.transaction((txn) async {
+      // 1. Insert transaction master
+      await txn.insert('transactions', {
+        'id': invoiceId,
+        'total_pay': totalPay,
+        'discount': discount,
+        'status': 'Selesai',
+        'note': note,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
 
-    // Loop and apply stock reduction query: UPDATE products SET stock = stock - qty WHERE id = product_id
-    for (final item in cartItems) {
-      final productId = item['product_id']?.toString();
-      final qty = item['quantity'] as int;
+      // 2. Insert items and decrement stock
+      for (final item in cartItems) {
+        final productId = item['product_id']?.toString() ?? '';
+        final name = item['name']?.toString() ?? '';
+        final quantity = item['quantity'] as int? ?? 0;
+        final price = (item['price'] as num?)?.toDouble() ?? 0.0;
 
-      final idx = _mockDatabase.indexWhere((p) => p.id == productId);
-      if (idx != -1) {
-        final currentProduct = _mockDatabase[idx];
-        final newStock = (currentProduct.stock - qty).clamp(0, currentProduct.stock);
+        await txn.insert('transaction_items', {
+          'transaction_id': invoiceId,
+          'product_name': name,
+          'quantity': quantity,
+          'price': price,
+        });
 
-        _mockDatabase[idx] = Product(
-          id: currentProduct.id,
-          name: currentProduct.name,
-          category: currentProduct.category,
-          stock: newStock,
-          price: currentProduct.price,
-          supplier: currentProduct.supplier,
-          imageUrl: currentProduct.imageUrl,
-          sku: currentProduct.sku,
-          satuan: currentProduct.satuan,
-          hargaBeli: currentProduct.hargaBeli,
-          minStockAlert: currentProduct.minStockAlert,
-          lokasiRak: currentProduct.lokasiRak,
-          description: currentProduct.description,
+        await txn.rawUpdate(
+          'UPDATE products SET stock = MAX(0, stock - ?) WHERE id = ?',
+          [quantity, productId],
         );
       }
-    }
-
-    // Save master-detail records dynamically to transaction history
-    _mockTransactions.insert(0, {
-      'id': invoiceId,
-      'total_pay': totalPay,
-      'discount': discount,
-      'status': 'Selesai',
-      'timestamp': DateTime.now(),
-      'items': cartItems.map((item) => {
-        'name': item['name'] as String,
-        'quantity': item['quantity'] as int,
-        'price': item['price'] as double,
-      }).toList(),
     });
   }
 
-  /// SQLite Aggregated Reporting for Horizontal Cards: Hari Ini, Minggu Ini, Bulan Ini
-  Future<Map<String, double>> getTransactionSummaryReporting() async {
-    await Future.delayed(const Duration(milliseconds: 150));
+  Future<List<Map<String, dynamic>>> getTransactions({
+    String? search,
+    String? dateFilter,
+    DateTimeRange? customDateRange,
+    String? statusFilter,
+  }) async {
+    final db = await database;
+    String whereClause = '';
+    List<dynamic> whereArgs = [];
+
+    // Date Filters
     final now = DateTime.now();
-
-    double todaySum = 0.0;
-    double weekSum = 0.0;
-    double monthSum = 0.0;
-
-    // Start of today (midnight)
-    final startOfToday = DateTime(now.year, now.month, now.day);
-
-    // Start of week (Monday first)
-    final daysToSubtract = now.weekday - 1;
-    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysToSubtract));
-
-    // Start of month
-    final startOfMonth = DateTime(now.year, now.month, 1);
-
-    for (final tx in _mockTransactions) {
-      if (tx['status'] == 'Selesai') {
-        final DateTime ts = tx['timestamp'] as DateTime;
-        final double amt = tx['total_pay'] as double;
-
-        if (ts.isAfter(startOfToday) || ts.isAtSameMomentAs(startOfToday)) {
-          todaySum += amt;
-        }
-        if (ts.isAfter(startOfWeek) || ts.isAtSameMomentAs(startOfWeek)) {
-          weekSum += amt;
-        }
-        if (ts.isAfter(startOfMonth) || ts.isAtSameMomentAs(startOfMonth)) {
-          monthSum += amt;
-        }
+    if (dateFilter != null && dateFilter != 'Semua') {
+      if (dateFilter == 'Hari Ini') {
+        final startOfToday = DateTime(now.year, now.month, now.day).toIso8601String();
+        whereClause += 'timestamp >= ?';
+        whereArgs.add(startOfToday);
+      } else if (dateFilter == 'Minggu Ini') {
+        final daysToSubtract = now.weekday - 1;
+        final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysToSubtract)).toIso8601String();
+        whereClause += 'timestamp >= ?';
+        whereArgs.add(startOfWeek);
+      } else if (dateFilter == 'Bulan Ini') {
+        final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+        whereClause += 'timestamp >= ?';
+        whereArgs.add(startOfMonth);
+      } else if (dateFilter == 'Custom' && customDateRange != null) {
+        final start = DateTime(customDateRange.start.year, customDateRange.start.month, customDateRange.start.day).toIso8601String();
+        final end = DateTime(customDateRange.end.year, customDateRange.end.month, customDateRange.end.day, 23, 59, 59, 999).toIso8601String();
+        whereClause += 'timestamp >= ? AND timestamp <= ?';
+        whereArgs.addAll([start, end]);
       }
     }
+
+    // Search Filter (by transaction id or item product name)
+    if (search != null && search.trim().isNotEmpty) {
+      final searchQuery = '%${search.trim().toLowerCase()}%';
+      if (whereClause.isNotEmpty) {
+        whereClause += ' AND ';
+      }
+      whereClause += '(LOWER(id) LIKE ? OR EXISTS (SELECT 1 FROM transaction_items ti WHERE ti.transaction_id = transactions.id AND LOWER(ti.product_name) LIKE ?))';
+      whereArgs.addAll([searchQuery, searchQuery]);
+    }
+
+    final List<Map<String, dynamic>> txMaps = await db.query(
+      'transactions',
+      where: whereClause.isNotEmpty ? whereClause : null,
+      whereArgs: whereArgs.isNotEmpty ? whereArgs : null,
+      orderBy: 'timestamp DESC',
+    );
+
+    List<Map<String, dynamic>> filtered = [];
+    for (final txMap in txMaps) {
+      final txId = txMap['id'] as String;
+      final items = await db.query(
+        'transaction_items',
+        where: 'transaction_id = ?',
+        whereArgs: [txId],
+      );
+      
+      filtered.add({
+        'id': txId,
+        'total_pay': (txMap['total_pay'] as num?)?.toDouble() ?? 0.0,
+        'discount': (txMap['discount'] as num?)?.toDouble() ?? 0.0,
+        'status': txMap['status'] as String,
+        'note': txMap['note'] as String?,
+        'timestamp': DateTime.parse(txMap['timestamp'] as String),
+        'items': items.map((item) => {
+          'name': item['product_name'] as String,
+          'quantity': item['quantity'] as int,
+          'price': (item['price'] as num?)?.toDouble() ?? 0.0,
+        }).toList(),
+      });
+    }
+
+    if (statusFilter != null) {
+      filtered = filtered.where((tx) => tx['status'] == statusFilter).toList();
+    }
+
+    return filtered;
+  }
+
+  Future<Map<String, double>> getTransactionSummaryReporting() async {
+    final db = await database;
+    final now = DateTime.now();
+
+    final startOfToday = DateTime(now.year, now.month, now.day).toIso8601String();
+    
+    final daysToSubtract = now.weekday - 1;
+    final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysToSubtract)).toIso8601String();
+
+    final startOfMonth = DateTime(now.year, now.month, 1).toIso8601String();
+
+    // Query for today
+    final todayRes = await db.rawQuery(
+      "SELECT SUM(total_pay) as sum FROM transactions WHERE status = 'Selesai' AND timestamp >= ?",
+      [startOfToday],
+    );
+    final todaySum = (todayRes.first['sum'] as num?)?.toDouble() ?? 0.0;
+
+    // Query for week
+    final weekRes = await db.rawQuery(
+      "SELECT SUM(total_pay) as sum FROM transactions WHERE status = 'Selesai' AND timestamp >= ?",
+      [startOfWeek],
+    );
+    final weekSum = (weekRes.first['sum'] as num?)?.toDouble() ?? 0.0;
+
+    // Query for month
+    final monthRes = await db.rawQuery(
+      "SELECT SUM(total_pay) as sum FROM transactions WHERE status = 'Selesai' AND timestamp >= ?",
+      [startOfMonth],
+    );
+    final monthSum = (monthRes.first['sum'] as num?)?.toDouble() ?? 0.0;
 
     return {
       'hari_ini': todaySum,
@@ -411,129 +513,45 @@ class DatabaseHelper {
     };
   }
 
-  /// SQLite Transaction List Query Supporting Search & Date Filters
-  Future<List<Map<String, dynamic>>> getTransactions({
-    String? search,
-    String? dateFilter, // 'Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini', 'Custom'
-    DateTimeRange? customDateRange,
-  }) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    Iterable<Map<String, dynamic>> filtered = _mockTransactions;
+  Future<List<TransactionItem>> getRecentTransactions({int limit = 5}) async {
+    final db = await database;
+    final List<Map<String, dynamic>> rows = await db.rawQuery('''
+      SELECT t.id, ti.product_name, t.timestamp, ti.quantity 
+      FROM transactions t 
+      JOIN transaction_items ti ON t.id = ti.transaction_id 
+      WHERE t.status = 'Selesai' 
+      ORDER BY t.timestamp DESC 
+      LIMIT ?
+    ''', [limit]);
 
-    // Search query: filters records matching the invoice ID or item names
-    if (search != null && search.trim().isNotEmpty) {
-      final query = search.trim().toLowerCase();
-      filtered = filtered.where((tx) {
-        final idMatch = (tx['id'] as String).toLowerCase().contains(query);
-        final items = tx['items'] as List;
-        final itemMatch = items.any((item) =>
-            (item['name'] as String).toLowerCase().contains(query));
-        return idMatch || itemMatch;
-      });
-    }
-
-    // Date filter
-    if (dateFilter != null && dateFilter != 'Semua') {
-      final now = DateTime.now();
-      if (dateFilter == 'Hari Ini') {
-        final startOfToday = DateTime(now.year, now.month, now.day);
-        filtered = filtered.where((tx) {
-          final ts = tx['timestamp'] as DateTime;
-          return ts.isAfter(startOfToday) || ts.isAtSameMomentAs(startOfToday);
-        });
-      } else if (dateFilter == 'Minggu Ini') {
-        final daysToSubtract = now.weekday - 1;
-        final startOfWeek = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysToSubtract));
-        filtered = filtered.where((tx) {
-          final ts = tx['timestamp'] as DateTime;
-          return ts.isAfter(startOfWeek) || ts.isAtSameMomentAs(startOfWeek);
-        });
-      } else if (dateFilter == 'Bulan Ini') {
-        final startOfMonth = DateTime(now.year, now.month, 1);
-        filtered = filtered.where((tx) {
-          final ts = tx['timestamp'] as DateTime;
-          return ts.isAfter(startOfMonth) || ts.isAtSameMomentAs(startOfMonth);
-        });
-      } else if (dateFilter == 'Custom' && customDateRange != null) {
-        final start = DateTime(customDateRange.start.year, customDateRange.start.month, customDateRange.start.day);
-        final end = DateTime(customDateRange.end.year, customDateRange.end.month, customDateRange.end.day, 23, 59, 59, 999);
-        filtered = filtered.where((tx) {
-          final ts = tx['timestamp'] as DateTime;
-          return (ts.isAfter(start) || ts.isAtSameMomentAs(start)) &&
-                 (ts.isBefore(end) || ts.isAtSameMomentAs(end));
-        });
-      }
-    }
-
-    // Return sorted chronologically (newest first)
-    final list = filtered.toList();
-    list.sort((a, b) => (b['timestamp'] as DateTime).compareTo(a['timestamp'] as DateTime));
-    return list;
-  }
-
-  // --- Category CRUD and Aggregations ---
-
-  /// Fetch total category count (Mock SQLite aggregation query)
-  Future<int> getCategoryCount() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    return _mockCategories.length;
-  }
-
-  /// Fetch total products count summed across categories (Mock SQLite aggregation query)
-  Future<int> getTotalProductCount() async {
-    await Future.delayed(const Duration(milliseconds: 100));
-    return _mockDatabase.length;
-  }
-
-  /// Gets product count for a specific category
-  int getProductCount(String categoryName) {
-    return _mockDatabase.where((p) => p.category == categoryName).length;
-  }
-
-  /// Fetch categories with search keywords (Mock SQLite query)
-  Future<List<CategoryModel>> getCategories({String? search}) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    if (search == null || search.trim().isEmpty) {
-      return _mockCategories;
-    }
-    final query = search.trim().toLowerCase();
-    return _mockCategories.where((c) => c.name.toLowerCase().contains(query)).toList();
-  }
-
-  /// Insert category row (Mock SQLite write query)
-  Future<void> insertCategory(String name) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final id = DateTime.now().millisecondsSinceEpoch.toString();
-    final emoji = _getEmojiForCategory(name);
-    _mockCategories.add(CategoryModel(
-      id: id,
-      name: name,
-      emoji: emoji,
-      modifiedAt: DateTime.now(),
-    ));
-  }
-
-  /// Update category row (Mock SQLite write query)
-  Future<void> updateCategory(String id, String newName) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    final idx = _mockCategories.indexWhere((c) => c.id == id);
-    if (idx != -1) {
-      _mockCategories[idx] = CategoryModel(
-        id: id,
-        name: newName,
-        emoji: _getEmojiForCategory(newName),
-        modifiedAt: DateTime.now(),
+    return List.generate(rows.length, (i) {
+      return TransactionItem(
+        id: rows[i]['id'] as String,
+        productName: rows[i]['product_name'] as String,
+        dateTime: DateTime.parse(rows[i]['timestamp'] as String),
+        quantityChange: -(rows[i]['quantity'] as int),
+        type: 'sale',
       );
-    }
+    });
   }
 
-  /// Delete category row (Mock SQLite delete query)
-  Future<void> deleteCategory(String id) async {
-    await Future.delayed(const Duration(milliseconds: 150));
-    _mockCategories.removeWhere((c) => c.id == id);
+  Future<int> getTodayTransactionsCount() async {
+    final db = await database;
+    final now = DateTime.now();
+    final startOfToday = DateTime(now.year, now.month, now.day).toIso8601String();
+    final result = await db.rawQuery(
+      "SELECT COUNT(*) as count FROM transactions WHERE status = 'Selesai' AND timestamp >= ?",
+      [startOfToday],
+    );
+    return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  /// Dynamic emoji selection mapping
+  Future<int> getSuppliersCount() async {
+    return SupplierDatabaseHelper.instance.getTotalSupplierCount();
+  }
+
+  // --- HELPER ---
+
   String _getEmojiForCategory(String name) {
     final lower = name.toLowerCase();
     if (lower.contains('minum') || lower.contains('susu') || lower.contains('kopi') || lower.contains('coke')) {

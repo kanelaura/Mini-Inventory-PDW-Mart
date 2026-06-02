@@ -11,6 +11,8 @@ class TransactionScreen extends StatefulWidget {
 }
 
 class _TransactionScreenState extends State<TransactionScreen> {
+  final TextEditingController _noteController = TextEditingController();
+
   // Cart state: List of Maps tracking selected products
   // E.g., {'product_id': '1', 'name': '...', 'price': 38000.0, 'quantity': 1, 'available_stock': 2, 'satuan': 'pcs'}
   final List<Map<String, dynamic>> _cartItems = [];
@@ -36,6 +38,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -342,6 +345,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
         invoiceId: _invoiceId,
         totalPay: totalPay,
         discount: _discount,
+        note: _noteController.text.trim(),
         cartItems: _cartItems,
       );
 
@@ -775,23 +779,6 @@ class _TransactionScreenState extends State<TransactionScreen> {
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
-              // Close icon link
-              GestureDetector(
-                onTap: () => _removeCartItem(index),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(
-                    Icons.close,
-                    size: 16,
-                    color: Color(0xFF94A3B8),
-                  ),
-                ),
-              ),
             ],
           ),
 
@@ -823,57 +810,12 @@ class _TransactionScreenState extends State<TransactionScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(color: const Color(0xFFCBD5E1)),
-                      borderRadius: BorderRadius.circular(20), // Oval shape
-                    ),
-                    child: Row(
-                      children: [
-                        // Decrement (red text)
-                        GestureDetector(
-                          onTap: () => _decrementQty(index),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            child: Icon(
-                              Icons.remove,
-                              size: 16,
-                              color: alertColor,
-                            ),
-                          ),
-                        ),
-                        // Current active qty
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(
-                            '$qty',
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w900,
-                              fontSize: 13,
-                              color: Color(0xFF1A1B21),
-                            ),
-                          ),
-                        ),
-                        // Increment (green text)
-                        GestureDetector(
-                          onTap: () => _incrementQty(index),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 6,
-                            ),
-                            child: Icon(
-                              Icons.add,
-                              size: 16,
-                              color: successColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  CartItemCounter(
+                    quantity: qty,
+                    maxStock: maxStock,
+                    onIncrement: () => _incrementQty(index),
+                    onDecrement: () => _decrementQty(index),
+                    onRemove: () => _removeCartItem(index),
                   ),
                 ],
               ),
@@ -893,99 +835,165 @@ class _TransactionScreenState extends State<TransactionScreen> {
     final totalItems = _cartItems.length;
     final totalQty = _calculateTotalQty();
 
-    return Card(
-      color: Colors.white,
-      margin: EdgeInsets.zero,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'RINGKASAN PEMBAYARAN',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF64748B),
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // Total Item Row
-            _buildSummaryRow('Total Item', '$totalItems'),
-            const SizedBox(height: 8),
-            // Total Qty Row
-            _buildSummaryRow('Total Kuantitas', '$totalQty pcs'),
-            const SizedBox(height: 8),
-            // Subtotal Row
-            _buildSummaryRow('Subtotal', _formatPrice(subtotal)),
-            const SizedBox(height: 8),
-            // Discount Row containing edit note hook
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          color: Colors.white,
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Text(
-                      'Diskon',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF64748B),
-                        fontWeight: FontWeight.w600,
+                const Text(
+                  'CATATAN TRANSAKSI',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF64748B),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _noteController,
+                  maxLines: 3,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF1A1B21),
+                    fontWeight: FontWeight.w500,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Tambahkan catatan (opsional)...',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontSize: 13,
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF1E3A8A),
+                        width: 1.5,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: _showDiscountDialog,
-                      child: const Icon(
-                        Icons.edit_note,
-                        size: 20,
-                        color: Color(0xFF3B82F6),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          color: Colors.white,
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: Color(0xFFE2E8F0)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'RINGKASAN PEMBAYARAN',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF64748B),
+                    letterSpacing: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Total Item Row
+                _buildSummaryRow('Total Item', '$totalItems'),
+                const SizedBox(height: 8),
+                // Total Qty Row
+                _buildSummaryRow('Total Kuantitas', '$totalQty pcs'),
+                const SizedBox(height: 8),
+                // Subtotal Row
+                _buildSummaryRow('Subtotal', _formatPrice(subtotal)),
+                const SizedBox(height: 8),
+                // Discount Row containing edit note hook
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Text(
+                          'Diskon',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF64748B),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: _showDiscountDialog,
+                          child: const Icon(
+                            Icons.edit_note,
+                            size: 20,
+                            color: Color(0xFF3B82F6),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '- ${_formatPrice(_discount)}',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFFEF4444),
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
                 ),
-                Text(
-                  '- ${_formatPrice(_discount)}',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    color: Color(0xFFEF4444),
-                    fontWeight: FontWeight.w800,
-                  ),
+                const Divider(height: 28, color: Color(0xFFE2E8F0)),
+                // Bold dominant total bayar calculation row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Bayar',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFF1A1B21),
+                      ),
+                    ),
+                    Text(
+                      _formatPrice(totalPay),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        color: primaryColor,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-            const Divider(height: 28, color: Color(0xFFE2E8F0)),
-            // Bold dominant total bayar calculation row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Bayar',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF1A1B21),
-                  ),
-                ),
-                Text(
-                  _formatPrice(totalPay),
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: primaryColor,
-                  ),
-                ),
-              ],
-            ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -1125,6 +1133,135 @@ class _TransactionScreenState extends State<TransactionScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Custom Widget: CartItemCounter
+/// A quantity counter with swipe-left gesture to remove item from cart
+class CartItemCounter extends StatefulWidget {
+  final int quantity;
+  final int maxStock;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
+  final VoidCallback onRemove;
+
+  const CartItemCounter({
+    super.key,
+    required this.quantity,
+    required this.maxStock,
+    required this.onIncrement,
+    required this.onDecrement,
+    required this.onRemove,
+  });
+
+  @override
+  State<CartItemCounter> createState() => _CartItemCounterState();
+}
+
+class _CartItemCounterState extends State<CartItemCounter> {
+  double _dragOffset = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      // Custom gesture: horizontal drag to reveal delete
+      onHorizontalDragStart: (_) {},
+      onHorizontalDragUpdate: (details) {
+        setState(() {
+          _dragOffset += details.delta.dx;
+          _dragOffset = _dragOffset.clamp(-80.0, 0.0);
+        });
+      },
+      onHorizontalDragEnd: (_) {
+        if (_dragOffset < -40) {
+          widget.onRemove();
+        }
+        setState(() {
+          _dragOffset = 0.0;
+        });
+      },
+      child: Stack(
+        children: [
+          // Background delete indicator
+          Positioned.fill(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: AnimatedOpacity(
+                opacity: _dragOffset < -20 ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 150),
+                child: Container(
+                  width: 60,
+                  margin: const EdgeInsets.only(right: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF4444),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.delete_outline,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Sliding counter widget
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            transform: Matrix4.translationValues(_dragOffset, 0, 0),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFCBD5E1)),
+              borderRadius: BorderRadius.circular(20),
+              color: Colors.white,
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: widget.onDecrement,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Icon(
+                      Icons.remove,
+                      size: 16,
+                      color: const Color(0xFFEF4444),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: Text(
+                    '${widget.quantity}',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 13,
+                      color: Color(0xFF1A1B21),
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: widget.onIncrement,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    child: Icon(
+                      Icons.add,
+                      size: 16,
+                      color: const Color(0xFF10B981),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

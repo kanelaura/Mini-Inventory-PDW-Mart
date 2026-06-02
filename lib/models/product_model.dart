@@ -66,4 +66,36 @@ class Product {
       'description': description,
     };
   }
+
+  Product copyWith({
+    String? id,
+    String? name,
+    String? category,
+    int? stock,
+    double? price,
+    String? supplier,
+    String? imageUrl,
+    String? sku,
+    String? satuan,
+    double? hargaBeli,
+    int? minStockAlert,
+    String? lokasiRak,
+    String? description,
+  }) {
+    return Product(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      stock: stock ?? this.stock,
+      price: price ?? this.price,
+      supplier: supplier ?? this.supplier,
+      imageUrl: imageUrl ?? this.imageUrl,
+      sku: sku ?? this.sku,
+      satuan: satuan ?? this.satuan,
+      hargaBeli: hargaBeli ?? this.hargaBeli,
+      minStockAlert: minStockAlert ?? this.minStockAlert,
+      lokasiRak: lokasiRak ?? this.lokasiRak,
+      description: description ?? this.description,
+    );
+  }
 }

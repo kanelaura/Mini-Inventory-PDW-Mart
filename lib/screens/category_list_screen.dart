@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import '../models/category_model.dart';
 import '../data/database_helper.dart';
+import 'dashboard_screen.dart';
+import 'transaction_screen.dart';
+import 'supplier_list_screen.dart';
+import 'settings_screen.dart';
 
 class CategoryListScreen extends StatefulWidget {
   const CategoryListScreen({super.key});
@@ -68,6 +72,28 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
     } else {
       return 'modified ${difference.inDays}d ago';
     }
+  }
+
+  Future<List<Map<String, dynamic>>> _loadCategoriesWithCounts(
+      String search) async {
+    final categories =
+        await DatabaseHelper.instance.getCategories(search: search);
+    final List<Map<String, dynamic>> result = [];
+    for (final cat in categories) {
+      final count = await DatabaseHelper.instance
+          .getProductCountForCategory(cat.name);
+      result.add({'category': cat, 'count': count});
+    }
+    return result;
+  }
+
+  Color _getCategoryColor(String name) {
+    final lower = name.toLowerCase();
+    if (lower.contains('minum')) return const Color(0xFF3B82F6);
+    if (lower.contains('makan')) return const Color(0xFF10B981);
+    if (lower.contains('elektronik')) return const Color(0xFF8B5CF6);
+    if (lower.contains('bersih')) return const Color(0xFFF59E0B);
+    return const Color(0xFF64748B);
   }
 
   /// Dialog modal trigger for INSERT Category
@@ -433,10 +459,8 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
 
           // CATEGORY CARD LIST VIEW
           Expanded(
-            child: FutureBuilder<List<CategoryModel>>(
-              future: DatabaseHelper.instance.getCategories(
-                search: _searchQuery,
-              ),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _loadCategoriesWithCounts(_searchQuery),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting &&
                     _isListLoading) {
@@ -457,9 +481,9 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                       return _buildGhostCard();
                     }
 
-                    final category = categories[index];
-                    final productCount = DatabaseHelper.instance
-                        .getProductCount(category.name);
+                    final data = categories[index];
+                    final category = data['category'] as CategoryModel;
+                    final productCount = data['count'] as int;
 
                     return _buildCategoryCard(
                       category,
@@ -568,17 +592,10 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       ),
       child: Row(
         children: [
-          // Left: square badge with emoji
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Center(
-              child: Text(category.emoji, style: const TextStyle(fontSize: 24)),
-            ),
+          // Left: square badge with emoji and custom painter pattern background
+          CategoryEmojiBadge(
+            emoji: category.emoji,
+            backgroundColor: _getCategoryColor(category.name),
           ),
 
           const SizedBox(width: 16),
@@ -761,19 +778,27 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
               return InkWell(
                 onTap: () {
                   if (index == 0) {
-                    if (Navigator.canPop(context)) {
-                      Navigator.pop(context, _hasChanges); // Pop back to Home
-                    }
-                  } else {
-                    setState(() {
-                      _currentNavIndex = index;
-                    });
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Navigasi ke menu ${item.label} (Mock)'),
-                        duration: const Duration(seconds: 1),
-                      ),
+                    Navigator.pushAndRemoveUntil(
+                      context,
+                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                      (route) => false,
+                    );
+                  } else if (index == 1) {
+                    setState(() { _currentNavIndex = 1; });
+                  } else if (index == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const TransactionScreen()),
+                    );
+                  } else if (index == 3) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SupplierListScreen()),
+                    );
+                  } else if (index == 4) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
                     );
                   }
                 },
@@ -832,6 +857,70 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       ),
     );
   }
+}
+
+/// Custom Widget: CategoryEmojiBadge
+/// Displays category emoji with a colored background that uses
+/// CustomPainter to draw a subtle decorative pattern behind it
+class CategoryEmojiBadge extends StatelessWidget {
+  final String emoji;
+  final Color backgroundColor;
+
+  const CategoryEmojiBadge({
+    super.key,
+    required this.emoji,
+    required this.backgroundColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _BadgeBackgroundPainter(color: backgroundColor),
+      child: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Center(
+          child: Text(
+            emoji,
+            style: const TextStyle(fontSize: 24),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BadgeBackgroundPainter extends CustomPainter {
+  final Color color;
+
+  _BadgeBackgroundPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Draw rounded rect background
+    final bgPaint = Paint()..color = color.withOpacity(0.15);
+    final rrect = RRect.fromRectAndRadius(
+      Rect.fromLTWH(0, 0, size.width, size.height),
+      const Radius.circular(10),
+    );
+    canvas.drawRRect(rrect, bgPaint);
+
+    // Draw subtle decorative dots pattern
+    final dotPaint = Paint()..color = color.withOpacity(0.12);
+    canvas.drawCircle(
+        Offset(size.width * 0.85, size.height * 0.15), 6, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.15, size.height * 0.85), 4, dotPaint);
+    canvas.drawCircle(
+        Offset(size.width * 0.8, size.height * 0.8), 3, dotPaint);
+  }
+
+  @override
+  bool shouldRepaint(_BadgeBackgroundPainter oldDelegate) =>
+      oldDelegate.color != color;
 }
 
 class _BottomNavItem {

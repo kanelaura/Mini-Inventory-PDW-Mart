@@ -7,6 +7,7 @@ import 'settings_screen.dart';
 import '../models/product_model.dart';
 import '../models/transaction_model.dart';
 import '../data/database_helper.dart';
+import 'transaction_history_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -32,11 +33,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool _isLoading = true;
   int _currentNavIndex = 0; // Home is active by default
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _loadAllData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   /// Fetches values from SharedPreferences and SQLite database helpers
@@ -313,12 +321,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ),
                   ],
                 ),
-                child: const TextField(
-                  style: TextStyle(
+                child: TextField(
+                  controller: _searchController,
+                  onSubmitted: (value) {
+                    if (value.trim().isNotEmpty) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ProductListScreen(
+                            initialSearch: value.trim(),
+                          ),
+                        ),
+                      ).then((_) {
+                        _searchController.clear();
+                        _loadAllData();
+                      });
+                    }
+                  },
+                  style: const TextStyle(
                     color: Color(0xFF0F172A),
                     fontWeight: FontWeight.w600,
                   ),
-                  decoration: InputDecoration(
+                  decoration: const InputDecoration(
                     hintText: 'Cari produk atau transaksi...',
                     hintStyle: TextStyle(
                       color: Color(0xFF94A3B8),
@@ -494,7 +518,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             GestureDetector(
               onTap: () {
-                _showLihatSemuaDialog('Stok Menipis');
+                _navigateToLihatSemua('Stok Menipis');
               },
               child: const Text(
                 'Lihat Semua',
@@ -595,36 +619,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
           const SizedBox(width: 12),
 
-          // Orange Badge container on the right
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFEF3C7),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'SISA',
-                  style: TextStyle(
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFFD97706),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  '${product.stock}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFFF59E0B), // Bold Orange
-                  ),
-                ),
-              ],
-            ),
-          ),
+          // Stock Status Badge on the right
+          StockStatusBadge(stock: product.stock, minAlert: product.minStockAlert),
         ],
       ),
     );
@@ -650,7 +646,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             GestureDetector(
               onTap: () {
-                _showLihatSemuaDialog('Transaksi Terbaru');
+                _navigateToLihatSemua('Transaksi Terbaru');
               },
               child: const Text(
                 'Lihat Semua',
@@ -839,14 +835,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     setState(() {
                       _currentNavIndex = index;
                     });
-                    // Showcase click response
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Navigasi ke menu ${item.label} (Mock)'),
-                        duration: const Duration(seconds: 1),
-                      ),
-                    );
                   }
                 },
                 splashColor: Colors.transparent,
@@ -926,36 +914,81 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showLihatSemuaDialog(String title) {
-    const Color primaryTheme = Color(0xFF00236F);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: Text(
-            title,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          content: Text(
-            'Halaman detail lengkap untuk $title akan segera hadir pada fase pengembangan berikutnya.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Tutup',
-                style: TextStyle(
-                  color: primaryTheme,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+  void _navigateToLihatSemua(String section) {
+    if (section == 'Stok Menipis') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const ProductListScreen()),
+      ).then((_) => _loadAllData());
+    } else if (section == 'Transaksi Terbaru') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const TransactionHistoryScreen(),
+        ),
+      ).then((_) => _loadAllData());
+    }
+  }
+}
+
+/// Custom Widget: StockStatusBadge
+/// Displays stock level with color-coded status and animated indicator
+class StockStatusBadge extends StatelessWidget {
+  final int stock;
+  final int minAlert;
+
+  const StockStatusBadge({
+    super.key,
+    required this.stock,
+    required this.minAlert,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine status
+    Color bgColor;
+    Color textColor;
+    String label;
+    IconData statusIcon;
+
+    if (stock == 0) {
+      bgColor = const Color(0xFFFEE2E2);
+      textColor = const Color(0xFFEF4444);
+      label = 'Habis';
+      statusIcon = Icons.remove_circle_outline;
+    } else if (stock <= minAlert) {
+      bgColor = const Color(0xFFFEF3C7);
+      textColor = const Color(0xFFF59E0B);
+      label = 'Menipis';
+      statusIcon = Icons.warning_amber_rounded;
+    } else {
+      bgColor = const Color(0xFFD1FAE5);
+      textColor = const Color(0xFF10B981);
+      label = 'Aman';
+      statusIcon = Icons.check_circle_outline;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(statusIcon, size: 12, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: textColor,
             ),
-          ],
-        );
-      },
+          ),
+        ],
+      ),
     );
   }
 }
