@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
-import 'screens/onboarding_screen.dart'; // Memastikan route ke onboarding terhubung dengan benar
+import 'screens/onboarding_screen.dart'; // route ke onboarding
 
 void main() {
-  // PENTING: Memastikan binding framework Flutter siap karena OnboardingScreen
-  // akan langsung mengeksekusi operasi asinkron (SharedPreferences & SQLite Init).
+  // inisialisasi binding flutter biar ga error pas manggil async
   WidgetsFlutterBinding.ensureInitialized();
   runApp(const PDWMartApp());
 }
@@ -15,26 +14,20 @@ class PDWMartApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'PDW Mart',
-      debugShowCheckedModeBanner:
-          false, // Menghilangkan banner DEBUG agar tampilan profesional saat demo
-      // Konfigurasi tema warna global mengikuti design system PDW Mart (Material 3)
+      debugShowCheckedModeBanner: false, // matiin banner debug
+      // setting tema aplikasi
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(
-            0xFF00236F,
-          ), // Deep Blue sebagai warna utama identitas toko
+          seedColor: const Color(0xFF00236F), // warna utama deep blue
           primary: const Color(0xFF00236F),
           primaryContainer: const Color(0xFF1E3A8A),
           secondary: const Color(0xFF2170E4),
           surface: const Color(0xFFF7F9FB),
         ),
-        // Menggunakan font Hanken Grotesk sesuai spesifikasi visual mockup
-        fontFamily: 'Hanken Grotesk',
+        fontFamily: 'Hanken Grotesk', // pake font hanken grotesk
       ),
-
-      // Gerbang utama aplikasi langsung diarahkan ke OnboardingScreen
-      home: const OnboardingScreen(),
+      home: const OnboardingScreen(), // arahin ke onboarding pas pertama buka
     );
   }
 }

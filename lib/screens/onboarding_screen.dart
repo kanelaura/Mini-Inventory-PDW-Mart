@@ -31,8 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     super.dispose();
   }
 
-  /// Checks if "store_name" and "owner_name" already exist in SharedPreferences.
-  /// If they exist, immediately navigates to DashboardScreen.
+  // cek apa nama toko sama pemilik udah ada di shared preferences
   Future<void> _checkOnboardingStatus() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -68,7 +67,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  /// Validates input, initializes SQLite, and stores credentials in SharedPreferences.
+  // fungsi submit form onboarding
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() {
@@ -76,10 +75,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       });
 
       try {
-        // 1. SQLite Database Hook: Initialize database configuration before routing
+        // inisialisasi database sqlite
         await DatabaseHelper.instance.database;
 
-        // 2. SharedPreferences Integration: Save inputs to keys 'store_name' and 'owner_name'
+        // simpen data ke shared preferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('store_name', _storeController.text.trim());
         await prefs.setString('owner_name', _ownerController.text.trim());

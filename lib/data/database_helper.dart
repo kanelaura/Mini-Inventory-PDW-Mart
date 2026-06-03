@@ -486,14 +486,14 @@ class DatabaseHelper {
   Future<void> deleteTransaction(String transactionId) async {
     final db = await database;
     await db.transaction((txn) async {
-      // 1. Get the items associated with this transaction first to restore stock
+      // 1. ambil data item transaksi buat balikin stok
       final List<Map<String, dynamic>> items = await txn.query(
         'transaction_items',
         where: 'transaction_id = ?',
         whereArgs: [transactionId],
       );
 
-      // 2. Restore stock for each item by matching the product name
+      // 2. balikin stok produk berdasarkan nama
       for (final item in items) {
         final productName = item['product_name'] as String? ?? '';
         final quantity = item['quantity'] as int? ?? 0;
@@ -506,7 +506,7 @@ class DatabaseHelper {
         }
       }
 
-      // 3. Delete the transaction items and the transaction master
+      // 3. hapus detail item dan master transaksi
       await txn.delete(
         'transaction_items',
         where: 'transaction_id = ?',
@@ -523,7 +523,7 @@ class DatabaseHelper {
   Future<void> updateTransactionStatus(String transactionId, String newStatus) async {
     final db = await database;
     await db.transaction((txn) async {
-      // 1. Get the current transaction master to check its old status
+      // 1. ambil transaksi buat cek status lama
       final List<Map<String, dynamic>> txList = await txn.query(
         'transactions',
         columns: ['status'],
@@ -536,16 +536,16 @@ class DatabaseHelper {
 
       if (oldStatus == newStatus) return; // No change
 
-      // 2. Query items to calculate stock adjustments
+      // 2. ambil item transaksi buat hitung stok
       final List<Map<String, dynamic>> items = await txn.query(
         'transaction_items',
         where: 'transaction_id = ?',
         whereArgs: [transactionId],
       );
 
-      // 3. Perform stock adjustment based on state transition
+      // 3. sesuaikan stok tergantung transisi status
       if (oldStatus == 'Selesai' && (newStatus == 'Dibatalkan' || newStatus == 'Pending')) {
-        // Restore stock (increment)
+        // tambahin stok (kembalikan)
         for (final item in items) {
           final productName = item['product_name'] as String? ?? '';
           final quantity = item['quantity'] as int? ?? 0;
@@ -557,7 +557,7 @@ class DatabaseHelper {
           }
         }
       } else if ((oldStatus == 'Dibatalkan' || oldStatus == 'Pending') && newStatus == 'Selesai') {
-        // Reduce stock (decrement)
+        // kurangi stok
         for (final item in items) {
           final productName = item['product_name'] as String? ?? '';
           final quantity = item['quantity'] as int? ?? 0;
@@ -570,7 +570,7 @@ class DatabaseHelper {
         }
       }
 
-      // 4. Update the transaction status
+      // 4. simpan status baru ke tabel transaksi
       await txn.update(
         'transactions',
         {'status': newStatus},

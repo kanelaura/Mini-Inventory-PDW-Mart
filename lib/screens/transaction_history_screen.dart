@@ -107,7 +107,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     }
   }
 
-  /// Date header format helper
+  // format tanggal grup
   String _formatGroupDate(DateTime dateTime) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
@@ -174,7 +174,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     return 'Rp ${buffer.toString().split('').reversed.join('')}';
   }
 
-  /// Opens Date Range Picker for Custom selection
+  // buka picker tanggal
   Future<void> _selectCustomDateRange() async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -210,7 +210,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     }
   }
 
-  /// Dialog confirmation to delete a transaction history record
+  // dialog konfirmasi hapus transaksi
   Future<void> _deleteTransaction(String transactionId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -270,7 +270,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     }
   }
 
-  /// Displays the interactive transaction details and status updates bottom sheet
+  // munculin bottom sheet detail transaksi
   void _showTransactionDetailsSheet(Map<String, dynamic> tx) {
     final String transactionId = tx['id'] ?? 'TRX-UNKNOWN';
     final DateTime ts = tx['timestamp'] as DateTime;
@@ -625,7 +625,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Status button helper builder for details sheet selection
+  // helper buat bikin tombol pilih status
   Widget _buildStatusSelectBtn({
     required String label,
     required String statusValue,
@@ -756,7 +756,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// App Bar Header with Slate Blue container background and Integrated Search
+  // header app bar sama search
   Widget _buildAppBarHeader(Color primaryContainer) {
     return Container(
       height: 210,
@@ -915,7 +915,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Single metric card detail layout
+  // card info metrik
   Widget _buildMetricCard({
     required String title,
     required String value,
@@ -981,7 +981,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Ribbon of chips filters
+  // filter pilihan hari/minggu/bulan
   Widget _buildFilterChips(Color primaryContainer, Color primaryContrast) {
     final filters = ['Semua', 'Hari Ini', 'Minggu Ini', 'Bulan Ini'];
 
@@ -1072,7 +1072,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Empty State Card layout
+  // tampilan pas data kosong
   Widget _buildEmptyState() {
     return Container(
       margin: const EdgeInsets.only(top: 16),
@@ -1111,7 +1111,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Chronological group cards renderer
+  // render list transaksi dikelompokkan tanggal
   Widget _buildGroupedTrail(
     Color primaryContainer,
     Color successAccent,
@@ -1180,7 +1180,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
     );
   }
 
-  /// Individual sales transaction card details
+  // card per masing-masing transaksi
   Widget _buildTransactionCard(
     Map<String, dynamic> tx, {
     required Color successAccent,
@@ -1338,7 +1338,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
 
 
 
-  /// System Navigation Bar
+  // nav bar bawah
   Widget _buildSystemNavigationBar(Color primaryContainer) {
     return Container(
       decoration: BoxDecoration(
@@ -1448,7 +1448,7 @@ class _TransactionHistoryScreenState extends State<TransactionHistoryScreen> {
   }
 
 
-  /// Trailing filter options bottom modal sheet
+  // filter status transaksi bottom sheet
   void _showFilterOptionsModal() {
     showModalBottomSheet(
       context: context,
