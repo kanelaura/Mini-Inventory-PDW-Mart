@@ -347,168 +347,174 @@ class _SettingsScreenState extends State<SettingsScreen> {
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Top Header Canvas rounded bottom
-                _buildHeaderCanvas(headerPrimary),
-
-                // Grouped Cards settings panel
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(20.0, 56.0, 20.0, 24.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        // SECTION TOKO
-                        _buildSectionHeader('TOKO'),
-                        _buildSettingsGroupCard([
-                          _buildTileItem(
-                            icon: Icons.storefront,
-                            title: 'Informasi Toko',
-                            onTap: _showEditStoreSheet,
-                          ),
-                          _buildTileItem(
-                            icon: Icons.balance,
-                            title: 'Satuan Produk',
-                            trailing: 'pcs',
-                          ),
-                          _buildTileItem(
-                            icon: Icons.warning_amber_rounded,
-                            title: 'Batas Stok Minimum',
-                            trailing: '5',
-                          ),
-                          _buildTileItem(
-                            icon: Icons.receipt,
-                            title: 'Format Struk',
-                            trailing: 'A4',
-                          ),
-                        ]),
-
-                        const SizedBox(height: 20),
-
-                        // SECTION TAMPILAN
-                        _buildSectionHeader('TAMPILAN'),
-                        _buildSettingsGroupCard([
-                          SettingsToggleTile(
-                            icon: Icons.dark_mode,
-                            title: 'Mode Gelap',
-                            value: _isDarkMode,
-                            activeColor: const Color(0xFF2170E4),
-                            onChanged: (val) async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('is_dark_mode', val);
-                              if (mounted) {
-                                setState(() { _isDarkMode = val; });
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    content: Text('Mode Gelap ${val ? "Aktif" : "Nonaktif"}'),
-                                    duration: const Duration(seconds: 1),
-                                  ),
-                                );
-                              }
-                            },
-                          ),
-                          _buildTileItem(
-                            icon: Icons.translate,
-                            title: 'Bahasa',
-                            trailing: 'Indonesia',
-                          ),
-                          _buildTileItem(
-                            icon: Icons.color_lens,
-                            title: 'Tema Warna',
-                            widgetTrailing: Container(
-                              width: 14,
-                              height: 14,
-                              decoration: const BoxDecoration(
-                                color: headerPrimary,
-                                shape: BoxShape.circle,
-                              ),
-                            ),
-                          ),
-                        ]),
-
-                        const SizedBox(height: 20),
-
-                        // SECTION DATA & KEAMANAN
-                        _buildSectionHeader('DATA & KEAMANAN'),
-                        _buildSettingsGroupCard([
-                          _buildTileItem(
-                            icon: Icons.lock_outline,
-                            title: 'PIN Keamanan',
-                            widgetTrailing: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF10B981).withValues(alpha: 0.12),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                'AKTIF',
-                                style: GoogleFonts.hankenGrotesk(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  color: const Color(0xFF10B981),
+                        // Header Canvas with overlapping card
+                        _buildHeaderCanvas(headerPrimary),
+                        const SizedBox(height: 60), // Space to compensate for the overlapping card (height: 100, bottom: -50)
+                        
+                        // Settings List Panel
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20.0, 0, 20.0, 24.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              // SECTION TOKO
+                              _buildSectionHeader('TOKO'),
+                              _buildSettingsGroupCard([
+                                _buildTileItem(
+                                  icon: Icons.storefront,
+                                  title: 'Informasi Toko',
+                                  onTap: _showEditStoreSheet,
                                 ),
-                              ),
-                            ),
-                          ),
-                          _buildTileItem(
-                            icon: Icons.backup_outlined,
-                            title: 'Backup Data',
-                            subtitle: 'Terakhir: 1 hari lalu',
-                            onTap: _triggerBackup,
-                          ),
-                          SettingsToggleTile(
-                            icon: Icons.sync,
-                            title: 'Sinkronisasi',
-                            value: _isSyncActive,
-                            activeColor: const Color(0xFF10B981),
-                            onChanged: (val) async {
-                              final prefs = await SharedPreferences.getInstance();
-                              await prefs.setBool('is_sync_active', val);
-                              setState(() { _isSyncActive = val; });
-                            },
-                          ),
-                          _buildTileItem(
-                            icon: Icons.delete_forever_outlined,
-                            title: 'Hapus Semua Data',
-                            titleColor: accentWarning,
-                            onTap: _confirmDeleteAllData,
-                          ),
-                        ]),
+                                _buildTileItem(
+                                  icon: Icons.balance,
+                                  title: 'Satuan Produk',
+                                  trailing: 'pcs',
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.warning_amber_rounded,
+                                  title: 'Batas Stok Minimum',
+                                  trailing: '5',
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.receipt,
+                                  title: 'Format Struk',
+                                  trailing: 'A4',
+                                ),
+                              ]),
 
-                        const SizedBox(height: 20),
+                              const SizedBox(height: 20),
 
-                        // SECTION TENTANG
-                        _buildSectionHeader('TENTANG'),
-                        _buildSettingsGroupCard([
-                          _buildTileItem(
-                            icon: Icons.info_outline,
-                            title: 'Versi Aplikasi',
-                            trailing: 'v1.0.0',
-                          ),
-                          _buildTileItem(
-                            icon: Icons.privacy_tip_outlined,
-                            title: 'Kebijakan Privasi',
-                            onTap: () {},
-                          ),
-                          _buildTileItem(
-                            icon: Icons.star_rate_outlined,
-                            title: 'Beri Rating',
-                            onTap: () {},
-                          ),
-                          _buildTileItem(
-                            icon: Icons.chat_bubble_outline,
-                            title: 'Hubungi Kami',
-                            onTap: () {},
-                          ),
-                        ]),
+                              // SECTION TAMPILAN
+                              _buildSectionHeader('TAMPILAN'),
+                              _buildSettingsGroupCard([
+                                SettingsToggleTile(
+                                  icon: Icons.dark_mode,
+                                  title: 'Mode Gelap',
+                                  value: _isDarkMode,
+                                  activeColor: const Color(0xFF2170E4),
+                                  onChanged: (val) async {
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    final prefs = await SharedPreferences.getInstance();
+                                    await prefs.setBool('is_dark_mode', val);
+                                    if (mounted) {
+                                      setState(() { _isDarkMode = val; });
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text('Mode Gelap ${val ? "Aktif" : "Nonaktif"}'),
+                                          duration: const Duration(seconds: 1),
+                                        ),
+                                      );
+                                    }
+                                  },
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.translate,
+                                  title: 'Bahasa',
+                                  trailing: 'Indonesia',
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.color_lens,
+                                  title: 'Tema Warna',
+                                  widgetTrailing: Container(
+                                    width: 14,
+                                    height: 14,
+                                    decoration: const BoxDecoration(
+                                      color: headerPrimary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                              ]),
 
-                        const SizedBox(height: 28),
+                              const SizedBox(height: 20),
 
-                        // Full width logout button
-                        _buildLogoutButton(accentWarning),
+                              // SECTION DATA & KEAMANAN
+                              _buildSectionHeader('DATA & KEAMANAN'),
+                              _buildSettingsGroupCard([
+                                _buildTileItem(
+                                  icon: Icons.lock_outline,
+                                  title: 'PIN Keamanan',
+                                  widgetTrailing: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      'AKTIF',
+                                      style: GoogleFonts.hankenGrotesk(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w900,
+                                        color: const Color(0xFF10B981),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.backup_outlined,
+                                  title: 'Backup Data',
+                                  subtitle: 'Terakhir: 1 hari lalu',
+                                  onTap: _triggerBackup,
+                                ),
+                                SettingsToggleTile(
+                                  icon: Icons.sync,
+                                  title: 'Sinkronisasi',
+                                  value: _isSyncActive,
+                                  activeColor: const Color(0xFF10B981),
+                                  onChanged: (val) async {
+                                    final prefs = await SharedPreferences.getInstance();
+                                    await prefs.setBool('is_sync_active', val);
+                                    setState(() { _isSyncActive = val; });
+                                  },
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.delete_forever_outlined,
+                                  title: 'Hapus Semua Data',
+                                  titleColor: accentWarning,
+                                  onTap: _confirmDeleteAllData,
+                                ),
+                              ]),
 
-                        const SizedBox(height: 24),
+                              const SizedBox(height: 20),
+
+                              // SECTION TENTANG
+                              _buildSectionHeader('TENTANG'),
+                              _buildSettingsGroupCard([
+                                _buildTileItem(
+                                  icon: Icons.info_outline,
+                                  title: 'Versi Aplikasi',
+                                  trailing: 'v1.0.0',
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.privacy_tip_outlined,
+                                  title: 'Kebijakan Privasi',
+                                  onTap: () {},
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.star_rate_outlined,
+                                  title: 'Beri Rating',
+                                  onTap: () {},
+                                ),
+                                _buildTileItem(
+                                  icon: Icons.chat_bubble_outline,
+                                  title: 'Hubungi Kami',
+                                  onTap: () {},
+                                ),
+                              ]),
+
+                              const SizedBox(height: 28),
+
+                              // Full width logout button
+                              _buildLogoutButton(accentWarning),
+                            ],
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -557,11 +563,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           // Overlapping store profile card
           Positioned(
-            bottom: -44,
+            bottom: -50,
             left: 20,
             right: 20,
             child: Container(
-              height: 88,
+              height: 100,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
@@ -611,31 +617,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Text(
                           _storeName,
                           style: GoogleFonts.hankenGrotesk(
-                            fontSize: 15,
+                            fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: const Color(0xFF0F172A),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Text(
                           'Pemilik: $_ownerName',
                           style: GoogleFonts.hankenGrotesk(
-                            fontSize: 11,
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: const Color(0xFF64748B),
                           ),
                         ),
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.location_on, size: 12, color: Color(0xFF94A3B8)),
+                            const Icon(Icons.location_on, size: 14, color: Color(0xFF94A3B8)),
                             const SizedBox(width: 4),
                             Text(
                               _location,
                               style: GoogleFonts.hankenGrotesk(
-                                fontSize: 10,
+                                fontSize: 11,
                                 color: const Color(0xFF94A3B8),
                                 fontWeight: FontWeight.w500,
                               ),

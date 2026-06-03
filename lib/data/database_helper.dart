@@ -11,13 +11,22 @@ class DatabaseHelper {
   DatabaseHelper._privateConstructor();
   static final DatabaseHelper instance = DatabaseHelper._privateConstructor();
   static Database? _database;
+  static Future<Database>? _databaseFuture;
 
   // Cached product count per category for synchronous UI helper
   final Map<String, int> _categoryProductCounts = {};
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
-    _database = await _initDatabase();
+    debugPrint('DatabaseHelper: database getter called. _database: $_database, _databaseFuture: $_databaseFuture');
+    if (_database != null) {
+      debugPrint('DatabaseHelper: returning cached _database.');
+      return _database!;
+    }
+    debugPrint('DatabaseHelper: initializing database future...');
+    _databaseFuture ??= _initDatabase();
+    debugPrint('DatabaseHelper: awaiting database future...');
+    _database = await _databaseFuture;
+    debugPrint('DatabaseHelper: database initialized successfully. _database: $_database');
     return _database!;
   }
 
@@ -472,6 +481,103 @@ class DatabaseHelper {
     }
 
     return filtered;
+  }
+
+  Future<void> deleteTransaction(String transactionId) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // 1. Get the items associated with this transaction first to restore stock
+      final List<Map<String, dynamic>> items = await txn.query(
+        'transaction_items',
+        where: 'transaction_id = ?',
+        whereArgs: [transactionId],
+      );
+
+      // 2. Restore stock for each item by matching the product name
+      for (final item in items) {
+        final productName = item['product_name'] as String? ?? '';
+        final quantity = item['quantity'] as int? ?? 0;
+
+        if (productName.isNotEmpty && quantity > 0) {
+          await txn.rawUpdate(
+            'UPDATE products SET stock = stock + ? WHERE name = ?',
+            [quantity, productName],
+          );
+        }
+      }
+
+      // 3. Delete the transaction items and the transaction master
+      await txn.delete(
+        'transaction_items',
+        where: 'transaction_id = ?',
+        whereArgs: [transactionId],
+      );
+      await txn.delete(
+        'transactions',
+        where: 'id = ?',
+        whereArgs: [transactionId],
+      );
+    });
+  }
+
+  Future<void> updateTransactionStatus(String transactionId, String newStatus) async {
+    final db = await database;
+    await db.transaction((txn) async {
+      // 1. Get the current transaction master to check its old status
+      final List<Map<String, dynamic>> txList = await txn.query(
+        'transactions',
+        columns: ['status'],
+        where: 'id = ?',
+        whereArgs: [transactionId],
+      );
+
+      if (txList.isEmpty) return;
+      final oldStatus = txList.first['status'] as String? ?? 'Selesai';
+
+      if (oldStatus == newStatus) return; // No change
+
+      // 2. Query items to calculate stock adjustments
+      final List<Map<String, dynamic>> items = await txn.query(
+        'transaction_items',
+        where: 'transaction_id = ?',
+        whereArgs: [transactionId],
+      );
+
+      // 3. Perform stock adjustment based on state transition
+      if (oldStatus == 'Selesai' && (newStatus == 'Dibatalkan' || newStatus == 'Pending')) {
+        // Restore stock (increment)
+        for (final item in items) {
+          final productName = item['product_name'] as String? ?? '';
+          final quantity = item['quantity'] as int? ?? 0;
+          if (productName.isNotEmpty && quantity > 0) {
+            await txn.rawUpdate(
+              'UPDATE products SET stock = stock + ? WHERE name = ?',
+              [quantity, productName],
+            );
+          }
+        }
+      } else if ((oldStatus == 'Dibatalkan' || oldStatus == 'Pending') && newStatus == 'Selesai') {
+        // Reduce stock (decrement)
+        for (final item in items) {
+          final productName = item['product_name'] as String? ?? '';
+          final quantity = item['quantity'] as int? ?? 0;
+          if (productName.isNotEmpty && quantity > 0) {
+            await txn.rawUpdate(
+              'UPDATE products SET stock = MAX(0, stock - ?) WHERE name = ?',
+              [quantity, productName],
+            );
+          }
+        }
+      }
+
+      // 4. Update the transaction status
+      await txn.update(
+        'transactions',
+        {'status': newStatus},
+        where: 'id = ?',
+        whereArgs: [transactionId],
+      );
+    });
   }
 
   Future<Map<String, double>> getTransactionSummaryReporting() async {

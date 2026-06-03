@@ -41,21 +41,29 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
     super.dispose();
   }
 
-  /// Refreshes statistical sums and vendor list from the DB mock helper
   Future<void> _loadAllData() async {
+    debugPrint('SupplierListScreen: _loadAllData started');
     setState(() {
       _isLoading = true;
     });
 
-    final messenger = ScaffoldMessenger.of(context);
-
     try {
+      debugPrint('SupplierListScreen: fetching total supplier count...');
       final total = await SupplierDatabaseHelper.instance
           .getTotalSupplierCount();
+      debugPrint('SupplierListScreen: total supplier count fetched: $total');
+
+      debugPrint('SupplierListScreen: fetching active supplier count...');
       final active = await SupplierDatabaseHelper.instance
           .getActiveSupplierCount();
+      debugPrint('SupplierListScreen: active supplier count fetched: $active');
+
+      debugPrint('SupplierListScreen: fetching cumulative products supplied...');
       final cumulative = await SupplierDatabaseHelper.instance
           .getCumulativeProductsSupplied();
+      debugPrint('SupplierListScreen: cumulative products supplied fetched: $cumulative');
+
+      debugPrint('SupplierListScreen: fetching suppliers list...');
       final list = await SupplierDatabaseHelper.instance.getSuppliers(
         search: _searchQuery,
         filter: _selectedFilter,
@@ -75,7 +83,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
         setState(() {
           _isLoading = false;
         });
-        messenger.showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Terjadi kesalahan memuat data: $e'),
             backgroundColor: const Color(0xFFEF4444),
@@ -615,11 +623,6 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           _buildSystemNavigationBar(primaryTheme),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showFormSheet(),
-        backgroundColor: primaryTheme,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
 
@@ -634,14 +637,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
-                icon: const Icon(Icons.arrow_back, color: Colors.white),
-                onPressed: () {
-                  if (mounted) {
-                    Navigator.pop(context);
-                  }
-                },
-              ),
+              const SizedBox(width: 48),
               Text(
                 'Supplier',
                 style: GoogleFonts.hankenGrotesk(
@@ -650,18 +646,7 @@ class _SupplierListScreenState extends State<SupplierListScreen> {
                   color: Colors.white,
                 ),
               ),
-              // Right-aligned mini circular badge enclosing Icons.add symbol
-              GestureDetector(
-                onTap: () => _showFormSheet(),
-                child: Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: const BoxDecoration(
-                    color: Colors.white24,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.add, color: Colors.white, size: 18),
-                ),
-              ),
+              const SizedBox(width: 48),
             ],
           ),
         ),

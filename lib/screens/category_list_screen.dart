@@ -25,7 +25,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   int _totalProducts = 0;
 
   bool _isListLoading = true;
-  bool _hasChanges = false; // Tracks changes for parent refresh
 
   @override
   void initState() {
@@ -147,7 +146,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                   setState(() => _isListLoading = true);
                   await DatabaseHelper.instance.insertCategory(name);
                   if (!mounted) return;
-                  _hasChanges = true;
                   _reloadScreen();
                   messenger.showSnackBar(
                     SnackBar(
@@ -228,7 +226,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                     newName,
                   );
                   if (!mounted) return;
-                  _hasChanges = true;
                   _reloadScreen();
                   messenger.showSnackBar(
                     const SnackBar(
@@ -291,7 +288,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                 setState(() => _isListLoading = true);
                 await DatabaseHelper.instance.deleteCategory(category.id);
                 if (!mounted) return;
-                _hasChanges = true;
                 _reloadScreen();
                 messenger.showSnackBar(
                   SnackBar(
@@ -330,14 +326,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       appBar: AppBar(
         backgroundColor: primaryColor,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context, _hasChanges);
-            }
-          },
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Kategori',
           style: TextStyle(
@@ -347,12 +336,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
           ),
         ),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add, color: Colors.white),
-            onPressed: _showAddCategoryDialog,
-          ),
-        ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -496,12 +479,6 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
             ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _showAddCategoryDialog,
-        backgroundColor: highlightColor,
-        elevation: 4,
-        child: const Icon(Icons.add, size: 28, color: Colors.white),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(
         primaryColor: primaryColor,

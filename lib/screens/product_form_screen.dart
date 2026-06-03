@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/product_model.dart';
 import '../data/database_helper.dart';
-import '../models/category_model.dart';
 import '../data/supplier_database_helper.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -199,6 +198,73 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
     }
   }
 
+  /// Triggers dialog confirmation to delete the current product
+  Future<void> _deleteProduct() async {
+    if (widget.product == null) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text(
+          'Hapus Produk',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus "${widget.product!.name}"?\nTindakan ini tidak dapat dibatalkan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal', style: TextStyle(color: Color(0xFF64748B))),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFEF4444),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      setState(() {
+        _isSubmitting = true;
+      });
+      try {
+        await DatabaseHelper.instance.deleteProduct(widget.product!.id);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${widget.product!.name} berhasil dihapus'),
+              backgroundColor: const Color(0xFF10B981),
+            ),
+          );
+          Navigator.pop(context, true); // Pop with true to notify list refresh
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Gagal menghapus produk: $e'),
+              backgroundColor: const Color(0xFFEF4444),
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Palette Specification Alignments
@@ -228,6 +294,11 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (isEditMode)
+            IconButton(
+              icon: const Icon(Icons.delete_outline, color: Colors.white),
+              onPressed: _isSubmitting ? null : _deleteProduct,
+            ),
           IconButton(
             icon: const Icon(Icons.save, color: Colors.white),
             onPressed: _isSubmitting ? null : _submitForm,
@@ -470,7 +541,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       _isLoadingDropdowns
                           ? const Center(child: CircularProgressIndicator())
                           : DropdownButtonFormField<String>(
-                              value: _selectedCategory,
+                              initialValue: _selectedCategory,
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
                                 color: textColor,
@@ -482,8 +553,9 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                                   )
                                   .toList(),
                               onChanged: (val) {
-                                if (val != null)
+                                if (val != null) {
                                   setState(() => _selectedCategory = val);
+                                }
                               },
                             ),
                     ],
@@ -504,7 +576,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
                       ),
                       const SizedBox(height: 6),
                       DropdownButtonFormField<String>(
-                        value: _selectedUnit,
+                        initialValue: _selectedUnit,
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           color: textColor,
@@ -708,7 +780,7 @@ class _ProductFormScreenState extends State<ProductFormScreen> {
             _isLoadingDropdowns
                 ? const Center(child: CircularProgressIndicator())
                 : DropdownButtonFormField<String>(
-                    value: _selectedSupplier,
+                    initialValue: _selectedSupplier,
                     style: TextStyle(fontWeight: FontWeight.w600, color: textColor),
                     decoration: _buildInputDecoration(
                       'Pilih Supplier',

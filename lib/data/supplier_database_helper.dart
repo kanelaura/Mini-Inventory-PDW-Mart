@@ -17,29 +17,43 @@ class SupplierDatabaseHelper {
     List<dynamic>? whereArgs;
 
     if (search != null && search.trim().isNotEmpty) {
-      whereClause = 'LOWER(name) LIKE ?';
+      whereClause = 'LOWER(s.name) LIKE ?';
       whereArgs = ['%${search.trim().toLowerCase()}%'];
     }
 
     if (filter != null && filter != 'Semua') {
       final int activeVal = filter == 'Aktif' ? 1 : 0;
       if (whereClause != null) {
-        whereClause += ' AND is_active = ?';
+        whereClause += ' AND s.is_active = ?';
         whereArgs!.add(activeVal);
       } else {
-        whereClause = 'is_active = ?';
+        whereClause = 's.is_active = ?';
         whereArgs = [activeVal];
       }
     }
 
-    final List<Map<String, dynamic>> maps = await db.query(
-      'suppliers',
-      where: whereClause,
-      whereArgs: whereArgs,
-      orderBy: 'name ASC',
-    );
+    final String query = '''
+      SELECT s.*, 
+             (SELECT COUNT(*) FROM products p WHERE p.supplier = s.name) as dynamic_product_count 
+      FROM suppliers s
+      ${whereClause != null ? 'WHERE $whereClause' : ''}
+      ORDER BY s.name ASC
+    ''';
 
-    return List.generate(maps.length, (i) => _supplierFromMap(maps[i]));
+    final List<Map<String, dynamic>> maps = await db.rawQuery(query, whereArgs);
+
+    return List.generate(maps.length, (i) {
+      final map = maps[i];
+      return Supplier(
+        id: map['id'] as String,
+        name: map['name'] as String,
+        type: map['type'] as String? ?? 'Lainnya',
+        phone: map['phone'] as String? ?? '',
+        location: map['location'] as String? ?? '',
+        isActive: map['is_active'] == 1,
+        productCount: map['dynamic_product_count'] as int? ?? 0,
+      );
+    });
   }
 
   // AGGREGATIONS
@@ -57,7 +71,11 @@ class SupplierDatabaseHelper {
 
   Future<int> getCumulativeProductsSupplied() async {
     final db = await database;
-    final result = await db.rawQuery('SELECT SUM(product_count) as sum FROM suppliers');
+    final result = await db.rawQuery('''
+      SELECT COUNT(*) as count 
+      FROM products 
+      WHERE supplier IN (SELECT name FROM suppliers)
+    ''');
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
@@ -102,19 +120,6 @@ class SupplierDatabaseHelper {
       'suppliers',
       where: 'id = ?',
       whereArgs: [id],
-    );
-  }
-
-  // HELPER — map SQLite row to Supplier model
-  Supplier _supplierFromMap(Map<String, dynamic> map) {
-    return Supplier(
-      id: map['id'] as String,
-      name: map['name'] as String,
-      type: map['type'] as String? ?? 'Lainnya',
-      phone: map['phone'] as String? ?? '',
-      location: map['location'] as String? ?? '',
-      isActive: map['is_active'] == 1,
-      productCount: map['product_count'] as int? ?? 0,
     );
   }
 }

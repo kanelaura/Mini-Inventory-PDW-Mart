@@ -558,10 +558,7 @@ class _TransactionScreenState extends State<TransactionScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white),
-                    onPressed: () => Navigator.pop(context, false),
-                  ),
+                  const SizedBox(width: 48),
                   const Text(
                     'Transaksi Jual',
                     style: TextStyle(

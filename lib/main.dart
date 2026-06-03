@@ -27,7 +27,7 @@ class PDWMartApp extends StatelessWidget {
           primary: const Color(0xFF00236F),
           primaryContainer: const Color(0xFF1E3A8A),
           secondary: const Color(0xFF2170E4),
-          background: const Color(0xFFF7F9FB),
+          surface: const Color(0xFFF7F9FB),
         ),
         // Menggunakan font Hanken Grotesk sesuai spesifikasi visual mockup
         fontFamily: 'Hanken Grotesk',

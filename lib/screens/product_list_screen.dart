@@ -3,10 +3,10 @@ import 'product_form_screen.dart';
 import '../models/product_model.dart';
 import '../data/database_helper.dart';
 import 'transaction_screen.dart';
-import 'transaction_history_screen.dart';
 import 'supplier_list_screen.dart';
 import 'settings_screen.dart';
 import 'dashboard_screen.dart';
+import 'category_list_screen.dart';
 
 class ProductListScreen extends StatefulWidget {
   final String? initialSearch;
@@ -43,7 +43,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
   Future<void> _loadCategories() async {
     final cats = await DatabaseHelper.instance.getCategories();
     setState(() {
-      _categories = ['Semua', ...cats.map((c) => c.name).toList()];
+      _categories = ['Semua', ...cats.map((c) => c.name)];
     });
   }
 
@@ -52,25 +52,30 @@ class _ProductListScreenState extends State<ProductListScreen> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Hapus Produk',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Hapus Produk',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         content: Text(
-            'Apakah kamu yakin ingin menghapus "${product.name}"?\nData tidak dapat dikembalikan.'),
+          'Apakah kamu yakin ingin menghapus "${product.name}"?\nData tidak dapat dikembalikan.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal',
-                style: TextStyle(color: Color(0xFF64748B))),
+            child: const Text(
+              'Batal',
+              style: TextStyle(color: Color(0xFF64748B)),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFEF4444),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                borderRadius: BorderRadius.circular(8),
+              ),
             ),
-            child: const Text('Hapus',
-                style: TextStyle(color: Colors.white)),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -78,7 +83,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
     if (confirm == true) {
       await DatabaseHelper.instance.deleteProduct(product.id);
-      setState(() { _loadProducts(); });
+      setState(() {
+        _loadProducts();
+      });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -162,12 +169,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
       appBar: AppBar(
         backgroundColor: primaryColor,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () {
-            Navigator.pop(context);
-          },
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Daftar Produk',
           style: TextStyle(
@@ -180,12 +182,17 @@ class _ProductListScreenState extends State<ProductListScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list, color: Colors.white),
+            tooltip: 'Kategori',
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Filter lanjutan akan segera hadir.'),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const CategoryListScreen(),
                 ),
-              );
+              ).then((_) {
+                _loadCategories();
+                _loadProducts();
+              });
             },
           ),
         ],
@@ -405,7 +412,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
                 return ListView.builder(
                   physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(20.0, 4.0, 20.0, 80.0),
+                  padding: const EdgeInsets.fromLTRB(20.0, 4.0, 20.0, 24.0),
                   itemCount: products.length,
                   itemBuilder: (context, index) {
                     final product = products[index];
@@ -423,29 +430,34 @@ class _ProductListScreenState extends State<ProductListScreen> {
               },
             ),
           ),
+          // Custom bottom navigation bar inside the body column
+          _buildBottomNavigationBar(
+            primaryColor: primaryColor,
+            secondaryColor: secondaryColor,
+          ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // Navigation to AddProductScreen
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const ProductFormScreen()),
-          ).then((value) {
-            if (value == true) {
-              setState(() {
-                _loadProducts();
-              });
-            }
-          });
-        },
-        backgroundColor: secondaryColor,
-        elevation: 6,
-        child: const Icon(Icons.add, size: 30, color: Colors.white),
-      ),
-      bottomNavigationBar: _buildBottomNavigationBar(
-        primaryColor: primaryColor,
-        secondaryColor: secondaryColor,
+      floatingActionButton: Padding(
+        padding: const EdgeInsets.only(bottom: 72.0),
+        child: FloatingActionButton(
+          onPressed: () {
+            // Navigation to AddProductScreen
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const ProductFormScreen(),
+              ),
+            ).then((value) {
+              if (value == true) {
+                setState(() {
+                  _loadProducts();
+                });
+              }
+            });
+          },
+          backgroundColor: primaryColor,
+          child: const Icon(Icons.add, color: Colors.white),
+        ),
       ),
     );
   }
@@ -496,148 +508,148 @@ class _ProductListScreenState extends State<ProductListScreen> {
             ),
           ],
         ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Left: Image Placeholder (80x80px)
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
-              borderRadius: BorderRadius.circular(8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Left: Image Placeholder (80x80px)
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                Icons.inventory_2_outlined,
+                color: primaryColor.withOpacity(0.6),
+                size: 32,
+              ),
             ),
-            child: Icon(
-              Icons.inventory_2_outlined,
-              color: primaryColor.withOpacity(0.6),
-              size: 32,
-            ),
-          ),
 
-          const SizedBox(width: 12),
+            const SizedBox(width: 12),
 
-          // Middle: Column Info Layout
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Category Label
-                Text(
-                  product.category.toUpperCase(),
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF94A3B8),
-                    letterSpacing: 1.0,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Product Name
-                Text(
-                  product.name,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: textColor,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 6),
-                // Price (bold green)
-                Text(
-                  _formatPrice(product.price),
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: successColor,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                // Supplier Info
-                Text(
-                  'Sup: ${product.supplier}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(width: 8),
-
-          // Right: Badges & Edit Trigger
-          SizedBox(
-            height: 110,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // Right Top: Stock Status Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: badgeBgColor,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    badgeText,
-                    style: TextStyle(
+            // Middle: Column Info Layout
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Category Label
+                  Text(
+                    product.category.toUpperCase(),
+                    style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: badgeTextColor,
+                      color: Color(0xFF94A3B8),
+                      letterSpacing: 1.0,
                     ),
                   ),
-                ),
-                ProductStockIndicator(
-                  stock: product.stock,
-                  maxStock: product.minStockAlert * 4,
-                ),
-                // Right Bottom: Edit Action trigger icon
-                GestureDetector(
-                  onTap: () {
-                    // Navigation to EditProductScreen
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            ProductFormScreen(product: product),
-                      ),
-                    ).then((value) {
-                      if (value == true) {
-                        setState(() {
-                          _loadProducts();
-                        });
-                      }
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: secondaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                  const SizedBox(height: 4),
+                  // Product Name
+                  Text(
+                    product.name,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: textColor,
                     ),
-                    child: Icon(
-                      Icons.edit_square,
-                      color: secondaryColor,
-                      size: 20,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  // Price (bold green)
+                  Text(
+                    _formatPrice(product.price),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: successColor,
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  // Supplier Info
+                  Text(
+                    'Sup: ${product.supplier}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+
+            const SizedBox(width: 8),
+
+            // Right: Badges & Edit Trigger
+            SizedBox(
+              height: 110,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  // Right Top: Stock Status Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: badgeBgColor,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: badgeTextColor,
+                      ),
+                    ),
+                  ),
+                  ProductStockIndicator(
+                    stock: product.stock,
+                    maxStock: product.minStockAlert * 4,
+                  ),
+                  // Right Bottom: Edit Action trigger icon
+                  GestureDetector(
+                    onTap: () {
+                      // Navigation to EditProductScreen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ProductFormScreen(product: product),
+                        ),
+                      ).then((value) {
+                        if (value == true) {
+                          setState(() {
+                            _loadProducts();
+                          });
+                        }
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: secondaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        Icons.edit_square,
+                        color: secondaryColor,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   /// Modern persistent bottom navigation bar
   Widget _buildBottomNavigationBar({
@@ -680,25 +692,39 @@ class _ProductListScreenState extends State<ProductListScreen> {
                   if (index == 0) {
                     Navigator.pushAndRemoveUntil(
                       context,
-                      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => const DashboardScreen(),
+                      ),
                       (route) => false,
                     );
                   } else if (index == 1) {
-                    setState(() { _currentNavIndex = index; });
+                    setState(() {
+                      _currentNavIndex = index;
+                    });
                   } else if (index == 2) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const TransactionScreen()),
-                    ).then((_) => setState(() { _loadProducts(); }));
+                      MaterialPageRoute(
+                        builder: (context) => const TransactionScreen(),
+                      ),
+                    ).then(
+                      (_) => setState(() {
+                        _loadProducts();
+                      }),
+                    );
                   } else if (index == 3) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const SupplierListScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => const SupplierListScreen(),
+                      ),
                     );
                   } else if (index == 4) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => const SettingsScreen()),
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
                     );
                   }
                 },
@@ -775,10 +801,7 @@ class ProductStockIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     return CustomPaint(
       size: const Size(36, 36),
-      painter: _StockArcPainter(
-        stock: stock,
-        maxStock: maxStock,
-      ),
+      painter: _StockArcPainter(stock: stock, maxStock: maxStock),
       child: SizedBox(
         width: 36,
         height: 36,
